@@ -2,51 +2,114 @@ package io.github.ruok0214.ingametimer;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import net.fabricmc.api.ClientModInitializer;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
+import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
-import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
-import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
-import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.KeyMapping;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.Options;
 import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
+import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal;
 
 public final class TimerClient implements ClientModInitializer {
     final TimerClock clock = new TimerClock();
     final TimerSettings settings = TimerSettings.load();
+    private boolean menuRequested;
 
     @Override
     public void onInitializeClient() {
         var category = KeyMapping.Category.register(TimerMod.id("main"));
-        KeyMapping menu = registerKey("menu", GLFW.GLFW_KEY_F8, category);
-        KeyMapping toggle = registerKey("toggle", GLFW.GLFW_KEY_F6, category);
-        KeyMapping reset = registerKey("reset", GLFW.GLFW_KEY_F7, category);
+        KeyMapping menu = registerKey("menu", category);
+        KeyMapping toggle = registerKey("toggle", category);
+        KeyMapping reset = registerKey("reset", category);
 
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> clock.changeWorld());
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            clock.changeWorld();
+            menuRequested = false;
+        });
         ClientPlayNetworking.registerGlobalReceiver(TimerMod.WorldTick.TYPE,
                 (payload, context) -> clock.observeTick(payload.tick()));
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            if (!settings.legacyBindingsCleared) migrateBindings(client.options, menu, toggle, reset);
             updateCompletion(System.nanoTime());
             if (client.level == null) return;
             while (toggle.consumeClick()) toggle();
             while (reset.consumeClick()) clock.reset();
-            if (menu.consumeClick()) client.gui.setScreen(new TimerScreen(this));
+            if (menu.consumeClick() || menuRequested) {
+                menuRequested = false;
+                client.gui.setScreen(new TimerScreen(this));
+            }
         });
 
-        HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, TimerMod.id("timer"), this::drawHud);
+        registerCommands();
+        new TimerHud(this).register();
     }
 
-    private static KeyMapping registerKey(String action, int key, KeyMapping.Category category) {
+    private static KeyMapping registerKey(String action, KeyMapping.Category category) {
         return KeyMappingHelper.registerKeyMapping(new KeyMapping(
-                "key.in_game_timer." + action, InputConstants.Type.KEYSYM, key, category));
+                "key.in_game_timer." + action, InputConstants.Type.KEYSYM, InputConstants.UNKNOWN.getValue(), category));
+    }
+
+    private void migrateBindings(Options options, KeyMapping menu, KeyMapping toggle, KeyMapping reset) {
+        boolean changed = clearLegacyBinding(menu, GLFW.GLFW_KEY_F8);
+        changed |= clearLegacyBinding(toggle, GLFW.GLFW_KEY_F6);
+        changed |= clearLegacyBinding(reset, GLFW.GLFW_KEY_F7);
+        if (changed) {
+            KeyMapping.resetMapping();
+            options.save();
+        }
+        settings.legacyBindingsCleared = true;
+        settings.save();
+    }
+
+    private static boolean clearLegacyBinding(KeyMapping mapping, int oldKeyCode) {
+        if (!KeyMappingHelper.getBoundKeyOf(mapping).equals(InputConstants.Type.KEYSYM.getOrCreate(oldKeyCode))) {
+            return false;
+        }
+        mapping.setKey(InputConstants.UNKNOWN);
+        return true;
+    }
+
+    private void registerCommands() {
+        ClientCommandRegistrationCallback.EVENT.register((dispatcher, access) -> dispatcher.register(literal("igt")
+                .requires(FabricClientCommandSource::attended)
+                .executes(context -> requestMenu())
+                .then(literal("settings").executes(context -> requestMenu()))
+                .then(literal("toggle").executes(context -> {
+                    toggle();
+                    return reportState(context.getSource());
+                }))
+                .then(literal("start").executes(context -> {
+                    start();
+                    return reportState(context.getSource());
+                }))
+                .then(literal("stop").executes(context -> {
+                    clock.stop(System.nanoTime());
+                    return reportState(context.getSource());
+                }))
+                .then(literal("resume").executes(context -> {
+                    start();
+                    return reportState(context.getSource());
+                }))
+                .then(literal("reset").executes(context -> {
+                    clock.reset();
+                    context.getSource().sendFeedback(text("command.reset"));
+                    return 1;
+                }))));
+    }
+
+    private int reportState(FabricClientCommandSource source) {
+        source.sendFeedback(text(clock.isRunning() ? "command.running" : "command.stopped"));
+        return 1;
+    }
+
+    int requestMenu() {
+        menuRequested = true;
+        return 1;
     }
 
     static Component text(String key, Object... args) {
@@ -59,55 +122,26 @@ public final class TimerClient implements ClientModInitializer {
         if (clock.isRunning()) {
             clock.stop(now);
         } else {
-            if (settings.countdown && clock.expired(now, settings.seconds)) clock.reset();
-            clock.start(now);
+            start();
         }
+    }
+
+    private void start() {
+        if (clock.isRunning()) return;
+        long now = System.nanoTime();
+        if (settings.countdown && clock.expired(now, settings.seconds)) clock.reset();
+        clock.start(now);
+    }
+
+    Component toggleLabel() {
+        if (clock.isRunning()) return text("stop");
+        long now = System.nanoTime();
+        boolean completed = settings.countdown && clock.expired(now, settings.seconds);
+        return text(clock.elapsedNanos(now) > 0 && !completed ? "resume" : "start");
     }
 
     private void updateCompletion(long now) {
         if (settings.countdown && clock.isRunning() && clock.expired(now, settings.seconds)) clock.stop(now);
     }
 
-    private void drawHud(GuiGraphicsExtractor graphics, DeltaTracker delta) {
-        Minecraft client = Minecraft.getInstance();
-        if (client.level == null) return;
-        long now = System.nanoTime();
-        List<Component> lines = hudLines(now);
-        if (lines.isEmpty()) return;
-
-        int width = lines.stream().mapToInt(client.font::width).max().orElse(0);
-        int height = lines.size() * 11 - 2;
-        int x = settings.corner.right ? graphics.guiWidth() - width - 8 : 8;
-        int y = settings.corner.bottom ? graphics.guiHeight() - height - 8 : 8;
-        graphics.fill(x - 4, y - 4, x + width + 4, y + height + 4, 0xA0000000);
-        for (Component line : lines) {
-            graphics.text(client.font, line, x, y, 0xFFFFFFFF);
-            y += 11;
-        }
-    }
-
-    private List<Component> hudLines(long now) {
-        long ticks = clock.elapsedTicks();
-        long nanos = clock.elapsedNanos(now);
-        if (settings.countdown) {
-            ticks = Math.max(0, settings.seconds * (long) TimerClock.TICKS_PER_SECOND - ticks);
-            nanos = Math.max(0, settings.seconds * TimerClock.NANOS_PER_SECOND - nanos);
-        }
-
-        List<Component> lines = new ArrayList<>(3);
-        if (clock.hasTickClock()) {
-            if (settings.gameTicks) lines.add(text("hud.game", ticks, formatTime(ticks * 50)));
-            if (settings.redstoneTicks) lines.add(text("hud.redstone", ticks / 2 + (ticks % 2 == 0 ? "" : ".5")));
-        } else if (settings.gameTicks || settings.redstoneTicks) {
-            lines.add(text("hud.no_tick_source"));
-        }
-        if (settings.realTime) lines.add(text("hud.real", formatTime(nanos / 1_000_000)));
-        return lines;
-    }
-
-    private static String formatTime(long millis) {
-        long seconds = millis / 1000;
-        return String.format(Locale.ROOT, "%02d:%02d:%02d.%03d",
-                seconds / 3600, seconds / 60 % 60, seconds % 60, millis % 1000);
-    }
 }

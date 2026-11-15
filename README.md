@@ -2,13 +2,18 @@
 
 Minecraft Java Edition 26.2용 Fabric 모드입니다. Fabric Loader 0.19.5 이상과 Minecraft 26.2용 Fabric API 0.160.0 이상이 필요합니다.
 
-| 기본 키 | 동작 |
+| 명령어 | 동작 |
 | --- | --- |
-| F6 | 시작, 정지, 이어서 시작 |
-| F7 | 초기화하고 정지 |
-| F8 | 설정 열기 |
+| `/igt toggle` | 시작, 정지, 재개 |
+| `/igt start`, `/igt stop`, `/igt resume` | 시작, 정지, 재개를 각각 실행 |
+| `/igt reset` | 초기화하고 정지 |
+| `/igt settings` 또는 `/igt` | 설정 열기 |
 
-설정에서 스톱워치와 카운트다운을 전환하고, 카운트다운 길이를 초 단위로 적용할 수 있습니다. 표시할 시계는 각각 켜거나 끌 수 있고 HUD는 화면의 네 모서리에 배치할 수 있습니다. 모드나 카운트다운 길이를 바꾸면 현재 측정값이 초기화됩니다. 설정은 `config/in_game_timer.json`에 저장됩니다.
+단축키는 기본적으로 미할당입니다. Minecraft의 조작 설정에 있는 **인게임 타이머** 항목에서 원하는 키를 지정할 수 있습니다. 업데이트 시 이전 버전의 기본 배치가 저장돼 있다면 한 번 미할당으로 바뀝니다.
+
+`T`를 눌러 채팅을 열면 HUD에 시작·정지·재개, 초기화, 설정 버튼이 나타납니다. HUD 본문을 마우스로 드래그하면 위치가 저장됩니다. HUD가 꺼져 있을 때는 `/igt settings`로 다시 켤 수 있습니다.
+
+설정에서 HUD 표시 여부, 불투명도(0~100%), 표시할 시계, 스톱워치·카운트다운 모드를 바꿀 수 있습니다. 모드나 카운트다운 길이를 바꾸면 현재 측정값이 초기화됩니다. 설정은 `config/in_game_timer.json`에 저장됩니다.
 
 - **게임틱**은 서버가 진행한 월드 틱을 셉니다. 함께 표시하는 게임 시간은 20게임틱을 1초로 환산합니다.
 - **레드스톤틱**은 게임틱 2개를 1레드스톤틱으로 표시합니다. 홀수 게임틱은 0.5레드스톤틱 단위로 표시합니다.
@@ -20,4 +25,4 @@ Minecraft Java Edition 26.2용 Fabric 모드입니다. Fabric Loader 0.19.5 이�
 
 ## 빌드
 
-JDK 25로 Windows에서는 `gradlew.bat build`, macOS와 Linux에서는 `./gradlew build`를 실행하세요. 설치용 JAR은 `build/libs/in-game-timer-1.0.0.jar`에 생성됩니다.
+JDK 25로 Windows에서는 `gradlew.bat build`, macOS와 Linux에서는 `./gradlew build`를 실행하세요. 설치용 JAR은 `build/libs/in-game-timer-1.1.0.jar`에 생성됩니다.

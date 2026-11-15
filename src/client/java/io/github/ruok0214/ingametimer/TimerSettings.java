@@ -28,9 +28,6 @@ final class TimerSettings {
             this.bottom = bottom;
         }
 
-        Corner next() {
-            return values()[(ordinal() + 1) % values().length];
-        }
     }
 
     boolean countdown;
@@ -38,7 +35,12 @@ final class TimerSettings {
     boolean gameTicks = true;
     boolean redstoneTicks = true;
     boolean realTime = true;
-    Corner corner = Corner.TOP_LEFT;
+    boolean hudVisible = true;
+    int opacity = 100;
+    double hudX;
+    double hudY;
+    boolean legacyBindingsCleared;
+    private Corner corner;
 
     static boolean validDuration(int seconds) {
         return seconds >= 1 && seconds <= 359_999;
@@ -50,7 +52,14 @@ final class TimerSettings {
             TimerSettings settings = JSON.fromJson(reader, TimerSettings.class);
             if (settings != null) {
                 if (!validDuration(settings.seconds)) settings.seconds = 60;
-                if (settings.corner == null) settings.corner = Corner.TOP_LEFT;
+                if (settings.corner != null) {
+                    settings.hudX = settings.corner.right ? 1 : 0;
+                    settings.hudY = settings.corner.bottom ? 1 : 0;
+                    settings.corner = null;
+                }
+                settings.opacity = Math.clamp(settings.opacity, 0, 100);
+                settings.hudX = Math.clamp(settings.hudX, 0, 1);
+                settings.hudY = Math.clamp(settings.hudY, 0, 1);
                 return settings;
             }
         } catch (IOException | JsonParseException exception) {
