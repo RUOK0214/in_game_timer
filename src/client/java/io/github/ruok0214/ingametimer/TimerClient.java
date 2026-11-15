@@ -21,16 +21,14 @@ public final class TimerClient implements ClientModInitializer {
     final TimerSession game = new TimerSession("game", true, store, store.game);
     final TimerSession real = new TimerSession("real", false, store, store.real);
     private TimerSession menuRequested;
+    private KeyBindings gameBindings;
+    private KeyBindings realBindings;
 
     @Override
     public void onInitializeClient() {
         var category = KeyMapping.Category.register(TimerMod.id("main"));
-        KeyMapping gameMenu = registerKey("menu", category);
-        KeyMapping gameToggle = registerKey("toggle", category);
-        KeyMapping gameReset = registerKey("reset", category);
-        KeyMapping realMenu = registerKey("real_menu", category);
-        KeyMapping realToggle = registerKey("real_toggle", category);
-        KeyMapping realReset = registerKey("real_reset", category);
+        gameBindings = registerKeys("", category);
+        realBindings = registerKeys("real_", category);
 
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             game.clock.changeWorld();
@@ -40,13 +38,13 @@ public final class TimerClient implements ClientModInitializer {
         ClientPlayNetworking.registerGlobalReceiver(TimerMod.WorldTick.TYPE,
                 (payload, context) -> game.clock.observeTick(payload.tick()));
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (!store.legacyBindingsCleared) migrateBindings(client.options, gameMenu, gameToggle, gameReset);
+            if (!store.legacyBindingsCleared) migrateBindings(client.options);
             long now = System.nanoTime();
             game.updateCompletion(now);
             real.updateCompletion(now);
             if (client.level == null) return;
-            handleKeys(game, gameMenu, gameToggle, gameReset);
-            handleKeys(real, realMenu, realToggle, realReset);
+            handleKeys(game, gameBindings);
+            handleKeys(real, realBindings);
             if (menuRequested != null) {
                 client.gui.setScreen(new TimerScreen(this, menuRequested));
                 menuRequested = null;
@@ -60,10 +58,19 @@ public final class TimerClient implements ClientModInitializer {
         TimerHud.register(this);
     }
 
-    private void handleKeys(TimerSession timer, KeyMapping menu, KeyMapping toggle, KeyMapping reset) {
-        while (toggle.consumeClick()) timer.toggle();
-        while (reset.consumeClick()) timer.clock.reset();
-        if (menu.consumeClick()) requestMenu(timer);
+    private void handleKeys(TimerSession timer, KeyBindings bindings) {
+        while (bindings.toggle().consumeClick()) timer.toggle();
+        while (bindings.reset().consumeClick()) timer.clock.reset();
+        if (bindings.menu().consumeClick()) requestMenu(timer);
+    }
+
+    KeyBindings bindings(TimerSession timer) {
+        return timer == game ? gameBindings : realBindings;
+    }
+
+    private static KeyBindings registerKeys(String prefix, KeyMapping.Category category) {
+        return new KeyBindings(registerKey(prefix + "menu", category),
+                registerKey(prefix + "toggle", category), registerKey(prefix + "reset", category));
     }
 
     private static KeyMapping registerKey(String action, KeyMapping.Category category) {
@@ -71,10 +78,10 @@ public final class TimerClient implements ClientModInitializer {
                 "key.in_game_timer." + action, InputConstants.Type.KEYSYM, InputConstants.UNKNOWN.getValue(), category));
     }
 
-    private void migrateBindings(Options options, KeyMapping menu, KeyMapping toggle, KeyMapping reset) {
-        boolean changed = clearLegacyBinding(menu, GLFW.GLFW_KEY_F8);
-        changed |= clearLegacyBinding(toggle, GLFW.GLFW_KEY_F6);
-        changed |= clearLegacyBinding(reset, GLFW.GLFW_KEY_F7);
+    private void migrateBindings(Options options) {
+        boolean changed = clearLegacyBinding(gameBindings.menu(), GLFW.GLFW_KEY_F8);
+        changed |= clearLegacyBinding(gameBindings.toggle(), GLFW.GLFW_KEY_F6);
+        changed |= clearLegacyBinding(gameBindings.reset(), GLFW.GLFW_KEY_F7);
         if (changed) {
             KeyMapping.resetMapping();
             options.save();
@@ -120,4 +127,6 @@ public final class TimerClient implements ClientModInitializer {
     static Component text(String key, Object... args) {
         return Component.translatable("in_game_timer." + key, args);
     }
+
+    record KeyBindings(KeyMapping menu, KeyMapping toggle, KeyMapping reset) {}
 }

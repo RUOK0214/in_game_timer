@@ -32,6 +32,7 @@ public final class TimerGameTest implements FabricClientGameTest {
             world.getConnection().waitForChunksDownload();
             context.waitFor(client -> timer.clock.isAvailable());
             verifyChatControls(context, owner);
+            verifyTimerSettings(context, owner);
 
             world.getServer().runCommand("tick freeze");
             world.getServer().runCommand("tick rate 40");
@@ -200,6 +201,57 @@ public final class TimerGameTest implements FabricClientGameTest {
             KeyMapping.resetMapping();
             client.options.save();
         });
+    }
+
+    private static void verifyTimerSettings(ClientGameTestContext context, TimerClient owner) {
+        command(context, "game settings");
+        context.waitForScreen(TimerScreen.class);
+        clickWidget(context, label("Minimal: Off"));
+        context.clickScreenButton("Key Bindings");
+        context.waitForScreen(TimerKeyScreen.class);
+        context.clickScreenButton("Start / stop / resume: Unbound");
+        context.getInput().pressKey(GLFW.GLFW_KEY_J);
+        context.clickScreenButton("Done");
+        context.waitForScreen(TimerScreen.class);
+        context.clickScreenButton("Done");
+        context.waitFor(client -> client.gui.screen() == null);
+        context.runOnClient(client -> {
+            var saved = TimerSettings.load();
+            check(saved.game.minimal && !saved.real.minimal, "Minimal display must be saved separately");
+            check(owner.bindings(owner.real).toggle().isUnbound(), "Game shortcut changed the real clock");
+        });
+
+        command(context, "real settings");
+        context.waitForScreen(TimerScreen.class);
+        context.clickScreenButton("Key Bindings");
+        context.waitForScreen(TimerKeyScreen.class);
+        context.clickScreenButton("Start / stop / resume: Unbound");
+        context.getInput().pressKey(GLFW.GLFW_KEY_K);
+        context.clickScreenButton("Done");
+        context.waitForScreen(TimerScreen.class);
+        context.clickScreenButton("Done");
+        context.waitFor(client -> client.gui.screen() == null);
+
+        context.getInput().pressKey(GLFW.GLFW_KEY_J);
+        context.waitFor(client -> owner.game.clock.isRunning() && !owner.real.clock.isRunning());
+        context.getInput().pressKey(GLFW.GLFW_KEY_K);
+        context.waitFor(client -> owner.game.clock.isRunning() && owner.real.clock.isRunning());
+        command(context, "game reset");
+        command(context, "real reset");
+
+        command(context, "game settings");
+        context.waitForScreen(TimerScreen.class);
+        context.clickScreenButton("Key Bindings");
+        context.waitForScreen(TimerKeyScreen.class);
+        clickWidget(context, widget -> widget.getMessage().getString().startsWith("Start / stop / resume:"));
+        context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+        context.runOnClient(client -> check(owner.bindings(owner.game).toggle().isUnbound()
+                        && !owner.bindings(owner.real).toggle().isUnbound(),
+                "Esc must clear only the shortcut being edited"));
+        context.clickScreenButton("Done");
+        context.waitForScreen(TimerScreen.class);
+        context.clickScreenButton("Done");
+        context.waitFor(client -> client.gui.screen() == null);
     }
 
     private static KeyMapping binding(KeyMapping[] keys, String action) {

@@ -72,11 +72,17 @@ final class TimerHud {
 
     private Layout layout(Font font, int screenWidth, int screenHeight) {
         List<Row> rows = rows(System.nanoTime());
-        int labelWidth = rows.stream().mapToInt(row -> font.width(row.label())).max().orElse(0);
         int valueWidth = rows.stream().mapToInt(row -> font.width(row.value())).max().orElse(0);
-        int textWidth = labelWidth + font.width(SEPARATOR) + valueWidth;
-        int width = Math.max(MIN_WIDTH, Math.max(textWidth, font.width(timer.title())) + PADDING * 2);
-        int height = PADDING * 2 + (rows.size() + 1) * ROW_HEIGHT - 2;
+        int labelWidth = 0;
+        int textWidth = valueWidth;
+        int width = Math.max(28, textWidth + PADDING * 2);
+        if (!settings.minimal) {
+            labelWidth = rows.stream().mapToInt(row -> font.width(row.label())).max().orElse(0);
+            textWidth += labelWidth + font.width(SEPARATOR);
+            width = Math.max(MIN_WIDTH, Math.max(textWidth, font.width(timer.title())) + PADDING * 2);
+        }
+        int rowCount = settings.minimal ? Math.max(1, rows.size()) : rows.size() + 1;
+        int height = PADDING * 2 + rowCount * ROW_HEIGHT - 2;
         int travelX = Math.max(0, screenWidth - MARGIN * 2 - width);
         int travelY = Math.max(0, screenHeight - MARGIN * 2 - CHAT_INPUT_HEIGHT - height);
         int x = MARGIN + (int) Math.round(settings.hudX * travelX);
@@ -98,13 +104,19 @@ final class TimerHud {
         int separatorWidth = font.width(SEPARATOR);
         int colonX = layout.separatorX();
         y += PADDING;
-        Component title = timer.title();
-        graphics.text(font, title, x + (layout.width() - font.width(title)) / 2, y, color, false);
-        y += ROW_HEIGHT;
+        if (!settings.minimal) {
+            Component title = timer.title();
+            graphics.text(font, title, x + (layout.width() - font.width(title)) / 2, y, color, false);
+            y += ROW_HEIGHT;
+        }
         for (Row row : layout.rows()) {
-            graphics.text(font, row.label(), colonX - font.width(row.label()), y, color, false);
-            graphics.text(font, SEPARATOR, colonX, y, color, false);
-            graphics.text(font, row.value(), colonX + separatorWidth, y, color, false);
+            if (settings.minimal) {
+                graphics.text(font, row.value(), x + layout.width() - PADDING - font.width(row.value()), y, color, false);
+            } else {
+                graphics.text(font, row.label(), colonX - font.width(row.label()), y, color, false);
+                graphics.text(font, SEPARATOR, colonX, y, color, false);
+                graphics.text(font, row.value(), colonX + separatorWidth, y, color, false);
+            }
             y += ROW_HEIGHT;
         }
     }
@@ -113,12 +125,12 @@ final class TimerHud {
         long ticks = timer.displayTicks(now);
         long nanos = timer.displayNanos(now);
         boolean available = timer.clock.isAvailable();
-        Component unavailable = text("hud.no_tick_source");
+        Component unavailable = settings.minimal ? Component.literal("—") : text("hud.no_tick_source");
         List<Row> rows = new ArrayList<>(3);
         if (settings.gameTicks) rows.add(new Row(text("hud.game"), available
-                ? text("hud.game_value", ticks) : unavailable));
+                ? Component.literal(Long.toString(ticks)) : unavailable));
         if (settings.redstoneTicks) rows.add(new Row(text("hud.redstone"), available
-                ? text("hud.redstone_value", ticks / 2 + (ticks % 2 == 0 ? "" : ".5")) : unavailable));
+                ? Component.literal(ticks / 2 + (ticks % 2 == 0 ? "" : ".5")) : unavailable));
         if (settings.realTime) rows.add(new Row(text("hud.real"), available
                 ? Component.literal(formatTime(nanos / 1_000_000)) : unavailable));
         return rows;
@@ -180,12 +192,14 @@ final class TimerHud {
         private void positionButtons() {
             currentLayout = layout(font, screen.width, screen.height);
             refreshLabel();
-            int buttonX = currentLayout.x();
+            int controlsWidth = Math.max(MIN_WIDTH, currentLayout.width());
+            int buttonX = Math.clamp(currentLayout.x() + (currentLayout.width() - controlsWidth) / 2,
+                    MARGIN, Math.max(MARGIN, screen.width - controlsWidth - MARGIN));
             int buttonY = currentLayout.y() + currentLayout.height() + BUTTON_GAP;
             if (buttonY + BUTTON_HEIGHT > screen.height - CHAT_INPUT_HEIGHT) {
                 buttonY = currentLayout.y() - BUTTON_HEIGHT - BUTTON_GAP;
             }
-            int available = currentLayout.width() - BUTTON_GAP * (buttons.size() - 1);
+            int available = controlsWidth - BUTTON_GAP * (buttons.size() - 1);
             for (int i = 0; i < buttons.size(); i++) {
                 Button button = buttons.get(i);
                 int width = available * (i + 1) / buttons.size() - available * i / buttons.size();

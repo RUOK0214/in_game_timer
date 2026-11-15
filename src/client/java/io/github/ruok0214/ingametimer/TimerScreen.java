@@ -15,7 +15,7 @@ import static io.github.ruok0214.ingametimer.TimerClient.text;
 
 final class TimerScreen extends Screen {
     private static final int PANEL_WIDTH = 224;
-    private static final int PANEL_HEIGHT = 179;
+    private static final int PANEL_HEIGHT = 186;
     private final TimerClient owner;
     private final TimerSession timer;
     private final int initialOpacity;
@@ -34,17 +34,18 @@ final class TimerScreen extends Screen {
     protected void init() {
         TimerSettings settings = timer.settings;
         int x = (width - PANEL_WIDTH) / 2;
-        int y = (height - PANEL_HEIGHT) / 2 + 24;
-        clockTab(owner.game, x, y - 9);
-        clockTab(owner.real, x + 114, y - 9);
+        int y = top() + 12;
+        int step = height < PANEL_HEIGHT ? 20 : 22;
+        clockTab(owner.game, x, y);
+        clockTab(owner.real, x + 114, y);
         addRenderableWidget(Button.builder(modeLabel(), button -> {
             settings.countdown = !settings.countdown;
             resetClock();
             timer.store.save();
             button.setMessage(modeLabel());
-        }).bounds(x, y + 15, PANEL_WIDTH, 20).build());
+        }).bounds(x, y + step, PANEL_WIDTH, 20).build());
 
-        duration = new EditBox(font, x, y + 39, 110, 20, text("duration"));
+        duration = new EditBox(font, x, y + step * 2, 110, 20, text("duration"));
         duration.setMaxLength(6);
         duration.setValue(Integer.toString(settings.seconds));
         addRenderableWidget(duration);
@@ -53,16 +54,20 @@ final class TimerScreen extends Screen {
             resetClock();
             timer.store.save();
             updateApplyButton();
-        }).bounds(x + 114, y + 39, 110, 20).build());
+        }).bounds(x + 114, y + step * 2, 110, 20).build());
         duration.setResponder(value -> updateApplyButton());
         updateApplyButton();
 
-        visibilityButton("game", settings.gameTicks, value -> settings.gameTicks = value, x, y + 63);
-        visibilityButton("redstone", settings.redstoneTicks, value -> settings.redstoneTicks = value, x + 114, y + 63);
-        visibilityButton("real", settings.realTime, value -> settings.realTime = value, x, y + 87);
-        visibilityButton("hud", settings.hudVisible, value -> settings.hudVisible = value, x + 114, y + 87)
+        visibilityButton("game", settings.gameTicks, value -> settings.gameTicks = value, x, y + step * 3);
+        visibilityButton("redstone", settings.redstoneTicks, value -> settings.redstoneTicks = value, x + 114, y + step * 3);
+        visibilityButton("real", settings.realTime, value -> settings.realTime = value, x, y + step * 4);
+        visibilityButton("hud", settings.hudVisible, value -> settings.hudVisible = value, x + 114, y + step * 4)
                 .setTooltip(Tooltip.create(text("drag_hint")));
-        addRenderableWidget(new AbstractSliderButton(x, y + 111, PANEL_WIDTH, 20,
+        visibilityButton("minimal", settings.minimal, value -> settings.minimal = value, x, y + step * 5);
+        addRenderableWidget(Button.builder(text("keybindings"), button ->
+                minecraft.gui.setScreen(new TimerKeyScreen(this, timer, owner.bindings(timer))))
+                .bounds(x + 114, y + step * 5, 110, 20).build());
+        addRenderableWidget(new AbstractSliderButton(x, y + step * 6, PANEL_WIDTH, 20,
                 text("opacity", settings.opacity), settings.opacity / 100.0) {
             @Override
             protected void updateMessage() {
@@ -79,11 +84,11 @@ final class TimerScreen extends Screen {
             timer.toggle();
             button.setMessage(timer.toggleLabel());
         })
-                .bounds(x, y + 135, 72, 20).build());
+                .bounds(x, y + step * 7, 72, 20).build());
         addRenderableWidget(Button.builder(text("reset"), button -> resetClock())
-                .bounds(x + 76, y + 135, 72, 20).build());
+                .bounds(x + 76, y + step * 7, 72, 20).build());
         addRenderableWidget(Button.builder(text("done"), button -> onClose())
-                .bounds(x + 152, y + 135, 72, 20).build());
+                .bounds(x + 152, y + step * 7, 72, 20).build());
     }
 
     private void clockTab(TimerSession target, int x, int y) {
@@ -143,6 +148,10 @@ final class TimerScreen extends Screen {
     @Override
     public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
         super.extractRenderState(graphics, mouseX, mouseY, delta);
-        graphics.centeredText(font, title, width / 2, (height - PANEL_HEIGHT) / 2, 0xFFFFFFFF);
+        graphics.centeredText(font, title, width / 2, top(), 0xFFFFFFFF);
+    }
+
+    private int top() {
+        return Math.max(0, (height - PANEL_HEIGHT) / 2);
     }
 }

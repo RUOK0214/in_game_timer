@@ -37,6 +37,7 @@ final class TimerSettings {
     boolean redstoneTicks = true;
     boolean realTime = true;
     boolean hudVisible = true;
+    boolean minimal;
     int opacity = 100;
     double hudX;
     double hudY;
