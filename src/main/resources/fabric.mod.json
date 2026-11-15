@@ -6,6 +6,7 @@
   "description": "Independent game tick, redstone tick and monotonic real-time clocks.",
   "authors": ["RUOK0214"],
   "environment": "*",
+  "mixins": [{ "config": "in_game_timer.mixins.json", "environment": "client" }],
   "entrypoints": {
     "main": ["io.github.ruok0214.ingametimer.TimerMod"],
     "client": ["io.github.ruok0214.ingametimer.TimerClient"]

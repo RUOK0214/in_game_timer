@@ -65,7 +65,7 @@ final class TimerScreen extends Screen {
                 .setTooltip(Tooltip.create(text("drag_hint")));
         visibilityButton("minimal", settings.minimal, value -> settings.minimal = value, x, y + step * 5);
         addRenderableWidget(Button.builder(text("keybindings"), button ->
-                minecraft.gui.setScreen(new TimerKeyScreen(this, timer, owner.bindings(timer))))
+                minecraft.gui.setScreen(new TimerKeyScreen(this, timer, owner)))
                 .bounds(x + 114, y + step * 5, 110, 20).build());
         addRenderableWidget(new AbstractSliderButton(x, y + step * 6, PANEL_WIDTH, 20,
                 text("opacity", settings.opacity), settings.opacity / 100.0) {

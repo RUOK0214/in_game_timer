@@ -11,6 +11,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 
 final class TimerSettings {
     private static final Gson JSON = new GsonBuilder().setPrettyPrinting().create();
@@ -53,6 +55,7 @@ final class TimerSettings {
             var json = JsonParser.parseReader(reader);
             if (!json.isJsonObject()) return new Store();
             Store store = JSON.fromJson(json, Store.class);
+            if (store.chords == null) store.chords = new HashMap<>();
             if (!json.getAsJsonObject().has("game")) store.game = JSON.fromJson(json, TimerSettings.class);
             if (store.game == null) store.game = new TimerSettings();
             store.game.normalize();
@@ -85,6 +88,7 @@ final class TimerSettings {
         TimerSettings game = new TimerSettings();
         TimerSettings real = new TimerSettings();
         boolean legacyBindingsCleared;
+        Map<String, TimerShortcuts.Chord> chords = new HashMap<>();
 
         Store() {
             real.hudX = 1;

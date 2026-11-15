@@ -6,6 +6,7 @@ import net.fabricmc.fabric.api.client.gametest.v1.FabricClientGameTest;
 import net.fabricmc.fabric.api.client.gametest.v1.context.ClientGameTestContext;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.screen.v1.Screens;
+import net.fabricmc.fabric.mixin.client.gametest.input.KeyboardHandlerAccessor;
 import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.gui.components.AbstractSliderButton;
@@ -13,6 +14,7 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.PauseScreen;
+import net.minecraft.client.input.KeyEvent;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.Arrays;
@@ -185,7 +187,7 @@ public final class TimerGameTest implements FabricClientGameTest {
         context.runOnClient(client -> {
             var bindings = Arrays.stream(client.options.keyMappings)
                     .filter(key -> key.getName().startsWith("key.in_game_timer.")).toList();
-            check(bindings.size() == 8 && bindings.stream().allMatch(KeyMapping::isUnbound),
+            check(bindings.size() == 9 && bindings.stream().allMatch(KeyMapping::isUnbound),
                     "Timer bindings must exist and default to unbound");
             binding(client.options.keyMappings, "menu").setKey(InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_F8));
             binding(client.options.keyMappings, "toggle").setKey(InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_F6));
@@ -216,6 +218,8 @@ public final class TimerGameTest implements FabricClientGameTest {
         context.getInput().pressKey(GLFW.GLFW_KEY_J);
         context.clickScreenButton("Show / hide HUD: Unbound");
         context.getInput().pressKey(GLFW.GLFW_KEY_H);
+        context.clickScreenButton("Show / hide both HUDs: Unbound");
+        pressShiftF(context);
         context.clickScreenButton("Done");
         context.waitForScreen(TimerScreen.class);
         context.clickScreenButton("Done");
@@ -234,6 +238,9 @@ public final class TimerGameTest implements FabricClientGameTest {
         context.getInput().pressKey(GLFW.GLFW_KEY_K);
         context.clickScreenButton("Show / hide HUD: Unbound");
         context.getInput().pressKey(GLFW.GLFW_KEY_U);
+        context.runOnClient(client -> check(Screens.getWidgets(client.gui.screen()).stream()
+                        .anyMatch(label("Show / hide both HUDs: Shift+F")),
+                "Both clocks must display the same shared binding"));
         context.clickScreenButton("Done");
         context.waitForScreen(TimerScreen.class);
         context.clickScreenButton("Done");
@@ -249,6 +256,20 @@ public final class TimerGameTest implements FabricClientGameTest {
             check(!TimerSettings.load().game.hudVisible, "HUD shortcut must save visibility");
             check(owner.game.clock.isRunning() && owner.real.clock.isRunning(), "HUD shortcut must leave timing active");
         });
+        context.getInput().pressKey(GLFW.GLFW_KEY_F);
+        context.runOnClient(client -> check(!owner.game.settings.hudVisible && owner.real.settings.hudVisible,
+                "A bare key must not trigger a modified shortcut"));
+        pressShiftF(context);
+        context.waitFor(client -> !owner.game.settings.hudVisible && !owner.real.settings.hudVisible);
+        pressShiftF(context);
+        context.waitFor(client -> owner.game.settings.hudVisible && owner.real.settings.hudVisible);
+        context.runOnClient(client -> {
+            var chord = TimerSettings.load().chords.get(owner.bothHuds.getName());
+            check(chord != null && chord.modifiers() == GLFW.GLFW_MOD_SHIFT
+                            && chord.key().equals(owner.bothHuds.saveString()),
+                    "The modifier and base key must survive saving");
+        });
+        context.getInput().pressKey(GLFW.GLFW_KEY_H);
         context.getInput().pressKey(GLFW.GLFW_KEY_U);
         context.waitFor(client -> !owner.game.settings.hudVisible && !owner.real.settings.hudVisible);
         context.getInput().pressKey(GLFW.GLFW_KEY_H);
@@ -270,6 +291,20 @@ public final class TimerGameTest implements FabricClientGameTest {
         context.waitForScreen(TimerScreen.class);
         context.clickScreenButton("Done");
         context.waitFor(client -> client.gui.screen() == null);
+    }
+
+    private static void pressShiftF(ClientGameTestContext context) {
+        context.runOnClient(client -> {
+            // Fabric's test input sends a zero modifier mask even when holdShift() is active.
+            var keyboard = (KeyboardHandlerAccessor) client.keyboardHandler;
+            long window = client.getWindow().handle();
+            var shift = new KeyEvent(GLFW.GLFW_KEY_LEFT_SHIFT, 0, GLFW.GLFW_MOD_SHIFT);
+            var chord = new KeyEvent(GLFW.GLFW_KEY_F, 0, GLFW.GLFW_MOD_SHIFT);
+            keyboard.invokeKeyPress(window, GLFW.GLFW_PRESS, shift);
+            keyboard.invokeKeyPress(window, GLFW.GLFW_PRESS, chord);
+            keyboard.invokeKeyPress(window, GLFW.GLFW_RELEASE, chord);
+            keyboard.invokeKeyPress(window, GLFW.GLFW_RELEASE, new KeyEvent(GLFW.GLFW_KEY_LEFT_SHIFT, 0, 0));
+        });
     }
 
     private static KeyMapping binding(KeyMapping[] keys, String action) {

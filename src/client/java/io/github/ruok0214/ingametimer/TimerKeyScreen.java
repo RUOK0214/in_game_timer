@@ -13,13 +13,16 @@ import static io.github.ruok0214.ingametimer.TimerClient.text;
 
 final class TimerKeyScreen extends Screen {
     private final Screen parent;
+    private final TimerClient owner;
     private final TimerClient.KeyBindings bindings;
     private KeyMapping pending;
+    private int pendingModifier = GLFW.GLFW_KEY_UNKNOWN;
 
-    TimerKeyScreen(Screen parent, TimerSession timer, TimerClient.KeyBindings bindings) {
+    TimerKeyScreen(Screen parent, TimerSession timer, TimerClient owner) {
         super(text("keybindings.title", timer.title()));
         this.parent = parent;
-        this.bindings = bindings;
+        this.owner = owner;
+        bindings = owner.bindings(timer);
     }
 
     @Override
@@ -30,13 +33,14 @@ final class TimerKeyScreen extends Screen {
         bindingButton("reset", bindings.reset(), x, y + 46);
         bindingButton("menu", bindings.menu(), x, y + 68);
         bindingButton("hud", bindings.hud(), x, y + 90);
+        bindingButton("both_huds", owner.bothHuds, x, y + 112);
         addRenderableWidget(Button.builder(text("done"), button -> onClose())
-                .bounds(x, y + 122, 224, 20).build());
+                .bounds(x, y + 144, 224, 20).build());
     }
 
     private void bindingButton(String action, KeyMapping binding, int x, int y) {
         var key = binding == pending ? text("keybindings.waiting")
-                : binding.isUnbound() ? text("keybindings.unbound") : binding.getTranslatedKeyMessage();
+                : owner.shortcuts.label(binding);
         addRenderableWidget(Button.builder(text("keybindings." + action, key), button -> {
             pending = binding;
             button.setMessage(text("keybindings." + action, text("keybindings.waiting")));
@@ -46,21 +50,36 @@ final class TimerKeyScreen extends Screen {
     @Override
     public boolean keyPressed(KeyEvent event) {
         if (pending == null) return super.keyPressed(event);
-        bind(event.key() == GLFW.GLFW_KEY_ESCAPE ? InputConstants.UNKNOWN : InputConstants.getKey(event));
+        if (TimerShortcuts.modifierKey(event.key()) != 0) {
+            pendingModifier = event.key();
+        } else if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
+            bind(InputConstants.UNKNOWN, 0);
+        } else {
+            bind(InputConstants.getKey(event), event.modifiers());
+        }
         return true;
+    }
+
+    @Override
+    public boolean keyReleased(KeyEvent event) {
+        if (pending != null && event.key() == pendingModifier) {
+            bind(InputConstants.getKey(event), event.modifiers());
+            return true;
+        }
+        return super.keyReleased(event);
     }
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
         if (pending == null) return super.mouseClicked(event, doubleClick);
-        bind(InputConstants.Type.MOUSE.getOrCreate(event.button()));
+        bind(InputConstants.Type.MOUSE.getOrCreate(event.button()), event.modifiers());
         return true;
     }
 
-    private void bind(InputConstants.Key key) {
-        pending.setKey(key);
+    private void bind(InputConstants.Key key, int modifiers) {
+        owner.shortcuts.assign(pending, key, modifiers);
         pending = null;
-        KeyMapping.resetMapping();
+        pendingModifier = GLFW.GLFW_KEY_UNKNOWN;
         minecraft.options.save();
         rebuildWidgets();
     }
@@ -83,6 +102,6 @@ final class TimerKeyScreen extends Screen {
     }
 
     private int top() {
-        return Math.max(0, (height - 142) / 2);
+        return Math.max(0, (height - 164) / 2);
     }
 }

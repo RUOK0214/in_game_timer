@@ -10,7 +10,9 @@ Minecraft Java Edition 26.2용 Fabric 모드입니다. Fabric Loader 0.19.5 이�
 
 `start`, `stop`, `resume` 명령으로 각 동작을 직접 실행할 수도 있습니다. 기존 `/igt` 명령은 게임 기준 시계에 적용됩니다.
 
-단축키는 기본적으로 미할당입니다. 각 시계의 설정에서 **단축키**를 열고 시작·정지·재개, 초기화, 설정 열기, HUD 표시·숨기기에 원하는 키를 지정하세요. 키 입력 대기 중에 `Esc`를 누르면 해제됩니다. Minecraft의 조작 설정에서도 같은 키를 변경할 수 있습니다.
+단축키는 기본적으로 미할당입니다. 각 시계의 설정에서 **단축키**를 열고 시작·정지·재개, 초기화, 설정 열기, HUD 표시·숨기기에 원하는 키를 지정하세요. `Shift+F`처럼 보조 키를 누른 채 다른 키를 누르면 조합으로 저장됩니다. 키 입력 대기 중에 `Esc`를 누르면 해제됩니다.
+
+**두 HUD 표시 / 숨기기**는 양쪽 설정 화면에서 지정할 수 있는 공통 단축키입니다. HUD가 하나라도 보이면 둘 다 숨기고, 둘 다 숨겨져 있으면 함께 표시합니다.
 
 `T`를 눌러 채팅을 열면 각 HUD에서 시작·정지·재개, 초기화, 설정을 조작할 수 있습니다. 각 본문을 마우스로 드래그해 위치를 따로 저장할 수 있습니다. HUD가 꺼져 있을 때는 해당 시계의 설정 명령으로 다시 켤 수 있습니다.
 
@@ -26,4 +28,4 @@ HUD에는 `game tick`, `redstone tick`, `real time`을 표시합니다. **최소
 
 ## 빌드
 
-JDK 25로 Windows에서는 `gradlew.bat build`, macOS와 Linux에서는 `./gradlew build`를 실행하세요. 설치용 JAR은 `build/libs/in-game-timer-1.4.0.jar`에 생성됩니다.
+JDK 25로 Windows에서는 `gradlew.bat build`, macOS와 Linux에서는 `./gradlew build`를 실행하세요. 설치용 JAR은 `build/libs/in-game-timer-1.5.0.jar`에 생성됩니다.

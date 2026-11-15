@@ -10,6 +10,7 @@ import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.client.KeyMapping;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
@@ -17,18 +18,23 @@ import org.lwjgl.glfw.GLFW;
 import static net.fabricmc.fabric.api.client.command.v2.ClientCommands.literal;
 
 public final class TimerClient implements ClientModInitializer {
+    private static TimerClient instance;
     final TimerSettings.Store store = TimerSettings.load();
+    final TimerShortcuts shortcuts = new TimerShortcuts(store);
     final TimerSession game = new TimerSession("game", true, store, store.game);
     final TimerSession real = new TimerSession("real", false, store, store.real);
     private TimerSession menuRequested;
     private KeyBindings gameBindings;
     private KeyBindings realBindings;
+    KeyMapping bothHuds;
 
     @Override
     public void onInitializeClient() {
         var category = KeyMapping.Category.register(TimerMod.id("main"));
-        gameBindings = registerKeys("", category);
-        realBindings = registerKeys("real_", category);
+        gameBindings = registerKeys(game, "", category);
+        realBindings = registerKeys(real, "real_", category);
+        bothHuds = shortcuts.register("both_huds", category, this::toggleBothHuds);
+        instance = this;
 
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
             game.clock.changeWorld();
@@ -43,8 +49,6 @@ public final class TimerClient implements ClientModInitializer {
             game.updateCompletion(now);
             real.updateCompletion(now);
             if (client.level == null) return;
-            handleKeys(game, gameBindings);
-            handleKeys(real, realBindings);
             if (menuRequested != null) {
                 client.gui.setScreen(new TimerScreen(this, menuRequested));
                 menuRequested = null;
@@ -58,29 +62,34 @@ public final class TimerClient implements ClientModInitializer {
         TimerHud.register(this);
     }
 
-    private void handleKeys(TimerSession timer, KeyBindings bindings) {
-        while (bindings.toggle().consumeClick()) timer.toggle();
-        while (bindings.reset().consumeClick()) timer.clock.reset();
-        while (bindings.hud().consumeClick()) {
-            timer.settings.hudVisible = !timer.settings.hudVisible;
-            timer.store.save();
-        }
-        if (bindings.menu().consumeClick()) requestMenu(timer);
+    public static boolean handleInput(long window, InputConstants.Key key, int action, int modifiers) {
+        if (instance == null) return false;
+        Minecraft client = Minecraft.getInstance();
+        if (window != client.getWindow().handle()) return false;
+        boolean gameplay = client.level != null && client.gui.screen() == null && client.gui.overlay() == null
+                && (key.getType() != InputConstants.Type.MOUSE || client.mouseHandler.isMouseGrabbed());
+        return instance.shortcuts.dispatch(key, action, modifiers, gameplay);
+    }
+
+    private void toggleBothHuds() {
+        boolean visible = !game.settings.hudVisible && !real.settings.hudVisible;
+        game.settings.hudVisible = visible;
+        real.settings.hudVisible = visible;
+        store.save();
     }
 
     KeyBindings bindings(TimerSession timer) {
         return timer == game ? gameBindings : realBindings;
     }
 
-    private static KeyBindings registerKeys(String prefix, KeyMapping.Category category) {
-        return new KeyBindings(registerKey(prefix + "menu", category),
-                registerKey(prefix + "toggle", category), registerKey(prefix + "reset", category),
-                registerKey(prefix + "hud", category));
-    }
-
-    private static KeyMapping registerKey(String action, KeyMapping.Category category) {
-        return KeyMappingHelper.registerKeyMapping(new KeyMapping(
-                "key.in_game_timer." + action, InputConstants.Type.KEYSYM, InputConstants.UNKNOWN.getValue(), category));
+    private KeyBindings registerKeys(TimerSession timer, String prefix, KeyMapping.Category category) {
+        return new KeyBindings(shortcuts.register(prefix + "menu", category, () -> requestMenu(timer)),
+                shortcuts.register(prefix + "toggle", category, timer::toggle),
+                shortcuts.register(prefix + "reset", category, timer.clock::reset),
+                shortcuts.register(prefix + "hud", category, () -> {
+                    timer.settings.hudVisible = !timer.settings.hudVisible;
+                    store.save();
+                }));
     }
 
     private void migrateBindings(Options options) {
