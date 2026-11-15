@@ -22,6 +22,9 @@ import java.util.function.Predicate;
 public final class TimerGameTest implements FabricClientGameTest {
     @Override
     public void runTest(ClientGameTestContext context) {
+        check(TimerHud.redstoneValue(5, true).equals("2"), "Running redstone display must use whole ticks");
+        check(TimerHud.redstoneValue(5, false).equals("2.5"), "Stopped redstone display must show the half tick");
+        check(TimerHud.redstoneValue(6, false).equals("3"), "Whole ticks must not gain a decimal suffix");
         TimerClient owner = (TimerClient) FabricLoader.getInstance()
                 .getEntrypointContainers("client", ClientModInitializer.class).stream()
                 .filter(entry -> entry.getProvider().getMetadata().getId().equals("in_game_timer"))
@@ -182,7 +185,7 @@ public final class TimerGameTest implements FabricClientGameTest {
         context.runOnClient(client -> {
             var bindings = Arrays.stream(client.options.keyMappings)
                     .filter(key -> key.getName().startsWith("key.in_game_timer.")).toList();
-            check(bindings.size() == 6 && bindings.stream().allMatch(KeyMapping::isUnbound),
+            check(bindings.size() == 8 && bindings.stream().allMatch(KeyMapping::isUnbound),
                     "Timer bindings must exist and default to unbound");
             binding(client.options.keyMappings, "menu").setKey(InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_F8));
             binding(client.options.keyMappings, "toggle").setKey(InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_F6));
@@ -211,6 +214,8 @@ public final class TimerGameTest implements FabricClientGameTest {
         context.waitForScreen(TimerKeyScreen.class);
         context.clickScreenButton("Start / stop / resume: Unbound");
         context.getInput().pressKey(GLFW.GLFW_KEY_J);
+        context.clickScreenButton("Show / hide HUD: Unbound");
+        context.getInput().pressKey(GLFW.GLFW_KEY_H);
         context.clickScreenButton("Done");
         context.waitForScreen(TimerScreen.class);
         context.clickScreenButton("Done");
@@ -227,6 +232,8 @@ public final class TimerGameTest implements FabricClientGameTest {
         context.waitForScreen(TimerKeyScreen.class);
         context.clickScreenButton("Start / stop / resume: Unbound");
         context.getInput().pressKey(GLFW.GLFW_KEY_K);
+        context.clickScreenButton("Show / hide HUD: Unbound");
+        context.getInput().pressKey(GLFW.GLFW_KEY_U);
         context.clickScreenButton("Done");
         context.waitForScreen(TimerScreen.class);
         context.clickScreenButton("Done");
@@ -236,6 +243,17 @@ public final class TimerGameTest implements FabricClientGameTest {
         context.waitFor(client -> owner.game.clock.isRunning() && !owner.real.clock.isRunning());
         context.getInput().pressKey(GLFW.GLFW_KEY_K);
         context.waitFor(client -> owner.game.clock.isRunning() && owner.real.clock.isRunning());
+        context.getInput().pressKey(GLFW.GLFW_KEY_H);
+        context.waitFor(client -> !owner.game.settings.hudVisible && owner.real.settings.hudVisible);
+        context.runOnClient(client -> {
+            check(!TimerSettings.load().game.hudVisible, "HUD shortcut must save visibility");
+            check(owner.game.clock.isRunning() && owner.real.clock.isRunning(), "HUD shortcut must leave timing active");
+        });
+        context.getInput().pressKey(GLFW.GLFW_KEY_U);
+        context.waitFor(client -> !owner.game.settings.hudVisible && !owner.real.settings.hudVisible);
+        context.getInput().pressKey(GLFW.GLFW_KEY_H);
+        context.getInput().pressKey(GLFW.GLFW_KEY_U);
+        context.waitFor(client -> owner.game.settings.hudVisible && owner.real.settings.hudVisible);
         command(context, "game reset");
         command(context, "real reset");
 

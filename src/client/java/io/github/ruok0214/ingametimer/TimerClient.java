@@ -61,6 +61,10 @@ public final class TimerClient implements ClientModInitializer {
     private void handleKeys(TimerSession timer, KeyBindings bindings) {
         while (bindings.toggle().consumeClick()) timer.toggle();
         while (bindings.reset().consumeClick()) timer.clock.reset();
+        while (bindings.hud().consumeClick()) {
+            timer.settings.hudVisible = !timer.settings.hudVisible;
+            timer.store.save();
+        }
         if (bindings.menu().consumeClick()) requestMenu(timer);
     }
 
@@ -70,7 +74,8 @@ public final class TimerClient implements ClientModInitializer {
 
     private static KeyBindings registerKeys(String prefix, KeyMapping.Category category) {
         return new KeyBindings(registerKey(prefix + "menu", category),
-                registerKey(prefix + "toggle", category), registerKey(prefix + "reset", category));
+                registerKey(prefix + "toggle", category), registerKey(prefix + "reset", category),
+                registerKey(prefix + "hud", category));
     }
 
     private static KeyMapping registerKey(String action, KeyMapping.Category category) {
@@ -128,5 +133,5 @@ public final class TimerClient implements ClientModInitializer {
         return Component.translatable("in_game_timer." + key, args);
     }
 
-    record KeyBindings(KeyMapping menu, KeyMapping toggle, KeyMapping reset) {}
+    record KeyBindings(KeyMapping menu, KeyMapping toggle, KeyMapping reset, KeyMapping hud) {}
 }

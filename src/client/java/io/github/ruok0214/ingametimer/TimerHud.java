@@ -130,10 +130,14 @@ final class TimerHud {
         if (settings.gameTicks) rows.add(new Row(text("hud.game"), available
                 ? Component.literal(Long.toString(ticks)) : unavailable));
         if (settings.redstoneTicks) rows.add(new Row(text("hud.redstone"), available
-                ? Component.literal(ticks / 2 + (ticks % 2 == 0 ? "" : ".5")) : unavailable));
+                ? Component.literal(redstoneValue(ticks, timer.clock.isRunning())) : unavailable));
         if (settings.realTime) rows.add(new Row(text("hud.real"), available
                 ? Component.literal(formatTime(nanos / 1_000_000)) : unavailable));
         return rows;
+    }
+
+    static String redstoneValue(long ticks, boolean running) {
+        return ticks / 2 + (!running && ticks % 2 != 0 ? ".5" : "");
     }
 
     private static String formatTime(long millis) {

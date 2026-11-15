@@ -29,8 +29,9 @@ final class TimerKeyScreen extends Screen {
         bindingButton("toggle", bindings.toggle(), x, y + 24);
         bindingButton("reset", bindings.reset(), x, y + 46);
         bindingButton("menu", bindings.menu(), x, y + 68);
+        bindingButton("hud", bindings.hud(), x, y + 90);
         addRenderableWidget(Button.builder(text("done"), button -> onClose())
-                .bounds(x, y + 100, 224, 20).build());
+                .bounds(x, y + 122, 224, 20).build());
     }
 
     private void bindingButton(String action, KeyMapping binding, int x, int y) {
@@ -82,6 +83,6 @@ final class TimerKeyScreen extends Screen {
     }
 
     private int top() {
-        return Math.max(0, (height - 120) / 2);
+        return Math.max(0, (height - 142) / 2);
     }
 }

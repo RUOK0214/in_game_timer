@@ -35,13 +35,16 @@
   "in_game_timer.keybindings.toggle": "시작 / 정지 / 재개: %s",
   "in_game_timer.keybindings.reset": "초기화: %s",
   "in_game_timer.keybindings.menu": "설정: %s",
+  "in_game_timer.keybindings.hud": "HUD 표시 / 숨기기: %s",
   "in_game_timer.keybindings.waiting": "키를 누르세요",
   "in_game_timer.keybindings.unbound": "미할당",
   "key.in_game_timer.menu": "게임 기준 시계 설정",
   "key.in_game_timer.toggle": "게임 기준 시계 시작 / 정지",
   "key.in_game_timer.reset": "게임 기준 시계 초기화",
+  "key.in_game_timer.hud": "게임 기준 시계 HUD 표시 / 숨기기",
   "key.in_game_timer.real_menu": "현실 기준 시계 설정",
   "key.in_game_timer.real_toggle": "현실 기준 시계 시작 / 정지",
   "key.in_game_timer.real_reset": "현실 기준 시계 초기화",
+  "key.in_game_timer.real_hud": "현실 기준 시계 HUD 표시 / 숨기기",
   "key.category.in_game_timer.main": "인게임 타이머"
 }
