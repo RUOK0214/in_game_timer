@@ -22,52 +22,64 @@ import java.util.function.Predicate;
 public final class TimerGameTest implements FabricClientGameTest {
     @Override
     public void runTest(ClientGameTestContext context) {
-        TimerClient timer = (TimerClient) FabricLoader.getInstance()
+        TimerClient owner = (TimerClient) FabricLoader.getInstance()
                 .getEntrypointContainers("client", ClientModInitializer.class).stream()
                 .filter(entry -> entry.getProvider().getMetadata().getId().equals("in_game_timer"))
                 .findFirst().orElseThrow().getEntrypoint();
+        TimerSession timer = owner.game;
+        TimerSession real = owner.real;
         try (var world = context.worldBuilder().create()) {
             world.getConnection().waitForChunksDownload();
-            context.waitFor(client -> timer.clock.hasTickClock());
-            verifyChatControls(context, timer);
+            context.waitFor(client -> timer.clock.isAvailable());
+            verifyChatControls(context, owner);
 
             world.getServer().runCommand("tick freeze");
             world.getServer().runCommand("tick rate 40");
             context.waitTicks(5);
             command(context, "start");
             context.waitFor(client -> timer.clock.isRunning());
-            long nanos = context.computeOnClient(client -> timer.clock.elapsedNanos(System.nanoTime()));
-            context.waitTicks(5);
+            context.runOnClient(client -> check(!real.clock.isRunning(), "Game start affected the real clock"));
+            command(context, "real start");
+            context.waitFor(client -> real.displayTicks(System.nanoTime()) >= 4);
             context.runOnClient(client -> {
-                check(timer.clock.elapsedTicks() == 0, "Frozen server advanced the tick clock");
-                check(timer.clock.elapsedNanos(System.nanoTime()) > nanos, "Real-time clock stopped during freeze");
+                check(timer.displayTicks(System.nanoTime()) == 0, "Frozen server advanced the game ticks");
+                check(timer.displayNanos(System.nanoTime()) == 0, "Frozen server advanced the game clock time");
+                check(real.displayNanos(System.nanoTime()) >= 4 * TimerClock.NANOS_PER_TICK,
+                        "Real time and its tick units must both advance during freeze");
             });
 
             world.getServer().runCommand("tick step 4");
-            context.waitFor(client -> timer.clock.elapsedTicks() >= 4);
+            context.waitFor(client -> timer.displayTicks(System.nanoTime()) >= 4);
             context.waitTicks(5);
-            context.runOnClient(client -> check(timer.clock.elapsedTicks() == 4, "Tick rate changed the step count"));
+            context.runOnClient(client -> {
+                check(timer.displayTicks(System.nanoTime()) == 4, "Tick rate changed the step count");
+                check(timer.displayNanos(System.nanoTime()) == 4 * TimerClock.NANOS_PER_TICK,
+                        "Game time must use 20 ticks per second");
+            });
             command(context, "stop");
             context.waitFor(client -> !timer.clock.isRunning());
             world.getServer().runCommand("tick unfreeze");
             context.waitTicks(5);
-            context.runOnClient(client -> check(timer.clock.elapsedTicks() == 4, "Stopped clock counted new server ticks"));
+            context.runOnClient(client -> check(timer.displayTicks(System.nanoTime()) == 4, "Stopped clock counted new server ticks"));
             command(context, "resume");
-            context.waitFor(client -> timer.clock.elapsedTicks() > 4);
+            context.waitFor(client -> timer.displayTicks(System.nanoTime()) > 4);
             command(context, "reset");
-            context.waitFor(client -> !timer.clock.isRunning() && timer.clock.elapsedTicks() == 0);
+            context.waitFor(client -> !timer.clock.isRunning() && timer.displayTicks(System.nanoTime()) == 0);
 
             command(context, "toggle");
-            context.waitFor(client -> timer.clock.elapsedTicks() > 0);
+            context.waitFor(client -> timer.displayTicks(System.nanoTime()) > 0);
             context.runOnClient(client -> client.gui.setScreen(new PauseScreen(true)));
             context.waitFor(client -> client.isPaused());
             context.waitTicks(5);
-            long pausedTicks = context.computeOnClient(client -> timer.clock.elapsedTicks());
-            long pausedNanos = context.computeOnClient(client -> timer.clock.elapsedNanos(System.nanoTime()));
+            long pausedTicks = context.computeOnClient(client -> timer.displayTicks(System.nanoTime()));
+            long pausedNanos = context.computeOnClient(client -> real.displayNanos(System.nanoTime()));
             context.waitTicks(5);
             context.runOnClient(client -> {
-                check(timer.clock.elapsedTicks() == pausedTicks, "Single-player pause advanced the tick clock");
-                check(timer.clock.elapsedNanos(System.nanoTime()) > pausedNanos, "Single-player pause stopped real time");
+                check(timer.displayTicks(System.nanoTime()) == pausedTicks
+                                && timer.displayNanos(System.nanoTime()) == pausedTicks * TimerClock.NANOS_PER_TICK,
+                        "Single-player pause advanced a game clock unit");
+                check(real.displayTicks(System.nanoTime()) > pausedNanos / TimerClock.NANOS_PER_TICK,
+                        "Single-player pause stopped the real clock tick units");
                 client.gui.setScreen(null);
             });
             context.waitFor(client -> !client.isPaused());
@@ -84,20 +96,29 @@ public final class TimerGameTest implements FabricClientGameTest {
             context.clickScreenButton("Set seconds");
             context.clickScreenButton("Start");
             context.clickScreenButton("Done");
-            context.waitFor(client -> timer.clock.elapsedNanos(System.nanoTime()) >= TimerClock.NANOS_PER_SECOND);
+            command(context, "real settings");
+            context.waitForScreen(TimerScreen.class);
+            context.clickScreenButton("Mode: Stopwatch");
+            context.runOnClient(client -> client.gui.screen().children().stream()
+                    .filter(EditBox.class::isInstance).map(EditBox.class::cast).findFirst().orElseThrow().setValue("1"));
+            context.clickScreenButton("Set seconds");
+            context.clickScreenButton("Start");
+            context.clickScreenButton("Done");
+            context.waitFor(client -> !real.clock.isRunning() && real.displayNanos(System.nanoTime()) == 0);
             context.runOnClient(client -> {
-                check(timer.clock.isRunning(), "Countdown completed while the tick clock was frozen");
-                check(timer.clock.elapsedTicks() == 0, "Frozen countdown counted world ticks");
+                check(timer.clock.isRunning(), "Game countdown completed while frozen");
+                check(timer.displayTicks(System.nanoTime()) == 20, "Frozen countdown lost world ticks");
             });
             world.getServer().runCommand("tick step 20");
             context.waitFor(client -> !timer.clock.isRunning());
-            context.runOnClient(client -> check(timer.clock.elapsedTicks() == 20,
+            context.runOnClient(client -> check(timer.clock.elapsedNanos(System.nanoTime()) == TimerClock.NANOS_PER_SECOND,
                     "One countdown second did not require exactly twenty game ticks"));
         }
     }
 
-    private static void verifyChatControls(ClientGameTestContext context, TimerClient timer) {
-        verifyBindings(context, timer);
+    private static void verifyChatControls(ClientGameTestContext context, TimerClient owner) {
+        verifyBindings(context, owner);
+        TimerSession timer = owner.game;
         context.runOnClient(client -> client.options.guiScale().set(2));
         openChat(context);
         clickWidget(context, label("Start"));
@@ -107,7 +128,7 @@ public final class TimerGameTest implements FabricClientGameTest {
         clickWidget(context, label("Resume"));
         context.waitFor(client -> timer.clock.isRunning());
         clickWidget(context, label("Reset"));
-        context.waitFor(client -> !timer.clock.isRunning() && timer.clock.elapsedTicks() == 0);
+        context.waitFor(client -> !timer.clock.isRunning() && timer.displayTicks(System.nanoTime()) == 0);
 
         Point start = widgetPoint(context, label("Start"), -8);
         Point before = widgetPoint(context, label("Settings"), 10);
@@ -121,15 +142,15 @@ public final class TimerGameTest implements FabricClientGameTest {
         context.runOnClient(client -> {
             long controls = Screens.getWidgets(client.gui.screen()).stream()
                     .filter(label("Start").or(label("Reset")).or(label("Settings"))).count();
-            check(controls == 3, "Resizing chat must keep a single set of HUD buttons");
+            check(controls == 6, "Resizing chat must keep one set of buttons per HUD");
         });
-        Point bottomRight = context.computeOnClient(client -> {
+        Point bottomLeft = context.computeOnClient(client -> {
             double scale = client.getWindow().getGuiScale();
-            return new Point((client.gui.screen().width - 2) * scale, (client.gui.screen().height - 2) * scale);
+            return new Point(2 * scale, (client.gui.screen().height - 2) * scale);
         });
-        drag(context, widgetPoint(context, label("Start"), -8), bottomRight);
-        context.runOnClient(client -> check(timer.settings.hudX == 1 && timer.settings.hudY == 1,
-                "HUD must be draggable to the bottom-right bound"));
+        drag(context, widgetPoint(context, label("Start"), -8), bottomLeft);
+        context.runOnClient(client -> check(timer.settings.hudX == 0 && timer.settings.hudY == 1,
+                "HUD must be draggable to the bottom-left bound"));
 
         clickWidget(context, label("Settings"));
         context.waitForScreen(TimerScreen.class);
@@ -138,14 +159,15 @@ public final class TimerGameTest implements FabricClientGameTest {
         context.clickScreenButton("Done");
         context.waitFor(client -> client.gui.screen() == null);
         context.runOnClient(client -> {
-            var saved = TimerSettings.load();
+            var saved = TimerSettings.load().game;
             check(saved.opacity >= 45 && saved.opacity <= 55 && !saved.hudVisible, "HUD controls were not saved");
             check(saved.hudX == timer.settings.hudX && saved.hudY == timer.settings.hudY, "Drag position was not saved");
         });
 
         openChat(context);
-        context.runOnClient(client -> check(Screens.getWidgets(client.gui.screen()).stream().noneMatch(label("Settings")),
-                "Hidden HUD must not add chat buttons"));
+        context.runOnClient(client -> check(Screens.getWidgets(client.gui.screen()).stream().filter(label("Settings")).count() == 1
+                        && owner.real.settings.hudVisible && owner.real.settings.opacity == 100,
+                "Hiding or fading one clock must not affect the other"));
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
         context.waitFor(client -> client.gui.screen() == null);
         command(context, "settings");
@@ -159,14 +181,14 @@ public final class TimerGameTest implements FabricClientGameTest {
         context.runOnClient(client -> {
             var bindings = Arrays.stream(client.options.keyMappings)
                     .filter(key -> key.getName().startsWith("key.in_game_timer.")).toList();
-            check(bindings.size() == 3 && bindings.stream().allMatch(KeyMapping::isUnbound),
+            check(bindings.size() == 6 && bindings.stream().allMatch(KeyMapping::isUnbound),
                     "Timer bindings must exist and default to unbound");
             binding(client.options.keyMappings, "menu").setKey(InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_F8));
             binding(client.options.keyMappings, "toggle").setKey(InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_F6));
             binding(client.options.keyMappings, "reset").setKey(InputConstants.Type.KEYSYM.getOrCreate(GLFW.GLFW_KEY_K));
-            timer.settings.legacyBindingsCleared = false;
+            timer.store.legacyBindingsCleared = false;
         });
-        context.waitFor(client -> timer.settings.legacyBindingsCleared);
+        context.waitFor(client -> timer.store.legacyBindingsCleared);
         context.runOnClient(client -> {
             check(binding(client.options.keyMappings, "menu").isUnbound()
                             && binding(client.options.keyMappings, "toggle").isUnbound(),

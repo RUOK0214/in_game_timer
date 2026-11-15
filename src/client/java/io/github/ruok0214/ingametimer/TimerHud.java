@@ -9,6 +9,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
@@ -30,25 +31,42 @@ final class TimerHud {
     private static final int CHAT_INPUT_HEIGHT = 16;
     private static final String SEPARATOR = " : ";
 
-    private final TimerClient timer;
+    private final TimerSession timer;
     private final TimerSettings settings;
 
-    TimerHud(TimerClient timer) {
+    private TimerHud(TimerSession timer) {
         this.timer = timer;
         settings = timer.settings;
     }
 
-    void register() {
+    static void register(TimerClient owner) {
+        var panels = List.of(new TimerHud(owner.game), new TimerHud(owner.real));
         HudElementRegistry.attachElementBefore(VanillaHudElements.CHAT, TimerMod.id("timer"), (graphics, delta) -> {
             Minecraft client = Minecraft.getInstance();
-            if (client.level == null || !settings.hudVisible || client.gui.screen() instanceof ChatScreen) return;
-            var layout = layout(client.font, graphics.guiWidth(), graphics.guiHeight());
-            draw(graphics, client.font, layout, false);
+            if (client.level == null || client.gui.screen() instanceof ChatScreen) return;
+            for (TimerHud panel : panels) {
+                if (!panel.settings.hudVisible) continue;
+                var layout = panel.layout(client.font, graphics.guiWidth(), graphics.guiHeight());
+                panel.draw(graphics, client.font, layout, false);
+            }
         });
         ScreenEvents.AFTER_INIT.register((client, screen, width, height) -> {
-            if (client.level != null && settings.hudVisible && screen instanceof ChatScreen chat) {
-                new ChatControls(chat, client.font).register();
-            }
+            if (client.level == null || !(screen instanceof ChatScreen chat)) return;
+            var controls = panels.stream().filter(panel -> panel.settings.hudVisible)
+                    .map(panel -> panel.new ChatControls(owner, chat, client.font)).toList();
+            if (controls.isEmpty()) return;
+            controls.forEach(ChatControls::addButtons);
+            ScreenEvents.beforeExtract(chat).register((s, graphics, x, y, delta) ->
+                    controls.forEach(ChatControls::positionButtons));
+            ScreenEvents.afterExtract(chat).register((s, graphics, x, y, delta) ->
+                    controls.forEach(control -> control.draw(graphics)));
+            ScreenMouseEvents.allowMouseClick(chat).register((s, mouse) ->
+                    controls.reversed().stream().allMatch(control -> control.click(mouse)));
+            ScreenMouseEvents.allowMouseDrag(chat).register((s, mouse, dx, dy) ->
+                    controls.reversed().stream().allMatch(control -> control.drag(mouse)));
+            ScreenMouseEvents.allowMouseRelease(chat).register((s, mouse) ->
+                    mouse.button() != GLFW.GLFW_MOUSE_BUTTON_LEFT || controls.stream().noneMatch(ChatControls::finishDrag));
+            ScreenEvents.remove(chat).register(s -> controls.forEach(ChatControls::finishDrag));
         });
     }
 
@@ -57,8 +75,8 @@ final class TimerHud {
         int labelWidth = rows.stream().mapToInt(row -> font.width(row.label())).max().orElse(0);
         int valueWidth = rows.stream().mapToInt(row -> font.width(row.value())).max().orElse(0);
         int textWidth = labelWidth + font.width(SEPARATOR) + valueWidth;
-        int width = Math.max(MIN_WIDTH, textWidth + PADDING * 2);
-        int height = PADDING * 2 + Math.max(1, rows.size()) * ROW_HEIGHT - 2;
+        int width = Math.max(MIN_WIDTH, Math.max(textWidth, font.width(timer.title())) + PADDING * 2);
+        int height = PADDING * 2 + (rows.size() + 1) * ROW_HEIGHT - 2;
         int travelX = Math.max(0, screenWidth - MARGIN * 2 - width);
         int travelY = Math.max(0, screenHeight - MARGIN * 2 - CHAT_INPUT_HEIGHT - height);
         int x = MARGIN + (int) Math.round(settings.hudX * travelX);
@@ -80,6 +98,9 @@ final class TimerHud {
         int separatorWidth = font.width(SEPARATOR);
         int colonX = layout.separatorX();
         y += PADDING;
+        Component title = timer.title();
+        graphics.text(font, title, x + (layout.width() - font.width(title)) / 2, y, color, false);
+        y += ROW_HEIGHT;
         for (Row row : layout.rows()) {
             graphics.text(font, row.label(), colonX - font.width(row.label()), y, color, false);
             graphics.text(font, SEPARATOR, colonX, y, color, false);
@@ -89,19 +110,17 @@ final class TimerHud {
     }
 
     private List<Row> rows(long now) {
-        long ticks = timer.clock.elapsedTicks();
-        long nanos = timer.clock.elapsedNanos(now);
-        if (settings.countdown) {
-            ticks = Math.max(0, settings.seconds * (long) TimerClock.TICKS_PER_SECOND - ticks);
-            nanos = Math.max(0, settings.seconds * TimerClock.NANOS_PER_SECOND - nanos);
-        }
-        boolean hasTicks = timer.clock.hasTickClock();
+        long ticks = timer.displayTicks(now);
+        long nanos = timer.displayNanos(now);
+        boolean available = timer.clock.isAvailable();
+        Component unavailable = text("hud.no_tick_source");
         List<Row> rows = new ArrayList<>(3);
-        if (settings.gameTicks) rows.add(new Row(text("hud.game"), hasTicks
-                ? text("hud.game_value", ticks, formatTime(ticks * 50)) : text("hud.no_tick_source")));
-        if (settings.redstoneTicks) rows.add(new Row(text("hud.redstone"), hasTicks
-                ? text("hud.redstone_value", ticks / 2 + (ticks % 2 == 0 ? "" : ".5")) : text("hud.no_tick_source")));
-        if (settings.realTime) rows.add(new Row(text("hud.real"), Component.literal(formatTime(nanos / 1_000_000))));
+        if (settings.gameTicks) rows.add(new Row(text("hud.game"), available
+                ? text("hud.game_value", ticks) : unavailable));
+        if (settings.redstoneTicks) rows.add(new Row(text("hud.redstone"), available
+                ? text("hud.redstone_value", ticks / 2 + (ticks % 2 == 0 ? "" : ".5")) : unavailable));
+        if (settings.realTime) rows.add(new Row(text("hud.real"), available
+                ? Component.literal(formatTime(nanos / 1_000_000)) : unavailable));
         return rows;
     }
 
@@ -129,7 +148,7 @@ final class TimerHud {
         private double grabX;
         private double grabY;
 
-        private ChatControls(ChatScreen screen, Font font) {
+        private ChatControls(TimerClient owner, ChatScreen screen, Font font) {
             this.screen = screen;
             this.font = font;
             buttons = List.of(
@@ -141,20 +160,17 @@ final class TimerHud {
                         timer.clock.reset();
                         refreshLabel();
                     }).build(),
-                    Button.builder(text("settings"), button -> timer.requestMenu()).build());
+                    Button.builder(text("settings"), button -> owner.requestMenu(timer)).build());
+            buttons.forEach(button -> button.setTooltip(Tooltip.create(timer.title())));
         }
 
-        void register() {
+        void addButtons() {
             Screens.getWidgets(screen).addAll(buttons);
             positionButtons();
-            ScreenEvents.beforeExtract(screen).register((screen, graphics, mouseX, mouseY, delta) -> positionButtons());
-            ScreenEvents.afterExtract(screen).register((screen, graphics, mouseX, mouseY, delta) ->
-                    draw(graphics, font, currentLayout, true));
-            ScreenMouseEvents.allowMouseClick(screen).register((screen, mouse) -> click(mouse));
-            ScreenMouseEvents.allowMouseDrag(screen).register((screen, mouse, dx, dy) -> drag(mouse));
-            ScreenMouseEvents.allowMouseRelease(screen).register((screen, mouse) ->
-                    mouse.button() != GLFW.GLFW_MOUSE_BUTTON_LEFT || !finishDrag());
-            ScreenEvents.remove(screen).register(screen -> finishDrag());
+        }
+
+        private void draw(GuiGraphicsExtractor graphics) {
+            TimerHud.this.draw(graphics, font, currentLayout, true);
         }
 
         private void refreshLabel() {
@@ -207,7 +223,7 @@ final class TimerHud {
         private boolean finishDrag() {
             if (!dragging) return false;
             dragging = false;
-            settings.save();
+            timer.store.save();
             return true;
         }
     }

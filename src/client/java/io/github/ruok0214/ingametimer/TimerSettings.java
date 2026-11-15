@@ -3,6 +3,7 @@ package io.github.ruok0214.ingametimer;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParseException;
+import com.google.gson.JsonParser;
 import net.fabricmc.loader.api.FabricLoader;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,43 +40,65 @@ final class TimerSettings {
     int opacity = 100;
     double hudX;
     double hudY;
-    boolean legacyBindingsCleared;
     private Corner corner;
 
     static boolean validDuration(int seconds) {
         return seconds >= 1 && seconds <= 359_999;
     }
 
-    static TimerSettings load() {
-        if (!Files.isRegularFile(FILE)) return new TimerSettings();
+    static Store load() {
+        if (!Files.isRegularFile(FILE)) return new Store();
         try (var reader = Files.newBufferedReader(FILE)) {
-            TimerSettings settings = JSON.fromJson(reader, TimerSettings.class);
-            if (settings != null) {
-                if (!validDuration(settings.seconds)) settings.seconds = 60;
-                if (settings.corner != null) {
-                    settings.hudX = settings.corner.right ? 1 : 0;
-                    settings.hudY = settings.corner.bottom ? 1 : 0;
-                    settings.corner = null;
-                }
-                settings.opacity = Math.clamp(settings.opacity, 0, 100);
-                settings.hudX = Math.clamp(settings.hudX, 0, 1);
-                settings.hudY = Math.clamp(settings.hudY, 0, 1);
-                return settings;
+            var json = JsonParser.parseReader(reader);
+            if (!json.isJsonObject()) return new Store();
+            Store store = JSON.fromJson(json, Store.class);
+            if (!json.getAsJsonObject().has("game")) store.game = JSON.fromJson(json, TimerSettings.class);
+            if (store.game == null) store.game = new TimerSettings();
+            store.game.normalize();
+            if (!json.getAsJsonObject().has("real") || store.real == null) {
+                store.real = new TimerSettings();
+                store.real.hudX = store.game.hudX < 0.5 ? 1 : 0;
+                store.real.hudY = store.game.hudY < 0.5 ? 1 : 0;
             }
+            store.real.normalize();
+            return store;
         } catch (IOException | JsonParseException exception) {
             LOGGER.warn("Could not load timer settings", exception);
         }
-        return new TimerSettings();
+        return new Store();
     }
 
-    void save() {
-        try {
-            Files.createDirectories(FILE.getParent());
-            try (var writer = Files.newBufferedWriter(FILE)) {
-                JSON.toJson(this, writer);
+    private void normalize() {
+        if (!validDuration(seconds)) seconds = 60;
+        if (corner != null) {
+            hudX = corner.right ? 1 : 0;
+            hudY = corner.bottom ? 1 : 0;
+            corner = null;
+        }
+        opacity = Math.clamp(opacity, 0, 100);
+        hudX = Math.clamp(hudX, 0, 1);
+        hudY = Math.clamp(hudY, 0, 1);
+    }
+
+    static final class Store {
+        TimerSettings game = new TimerSettings();
+        TimerSettings real = new TimerSettings();
+        boolean legacyBindingsCleared;
+
+        Store() {
+            real.hudX = 1;
+            real.hudY = 1;
+        }
+
+        void save() {
+            try {
+                Files.createDirectories(FILE.getParent());
+                try (var writer = Files.newBufferedWriter(FILE)) {
+                    JSON.toJson(this, writer);
+                }
+            } catch (IOException exception) {
+                LOGGER.warn("Could not save timer settings", exception);
             }
-        } catch (IOException exception) {
-            LOGGER.warn("Could not save timer settings", exception);
         }
     }
 }

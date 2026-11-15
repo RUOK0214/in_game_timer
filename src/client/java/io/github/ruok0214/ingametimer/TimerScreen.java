@@ -15,15 +15,17 @@ import static io.github.ruok0214.ingametimer.TimerClient.text;
 
 final class TimerScreen extends Screen {
     private static final int PANEL_WIDTH = 224;
-    private static final int PANEL_HEIGHT = 151;
-    private final TimerClient timer;
+    private static final int PANEL_HEIGHT = 179;
+    private final TimerClient owner;
+    private final TimerSession timer;
     private final int initialOpacity;
     private EditBox duration;
     private Button apply;
     private Button toggle;
 
-    TimerScreen(TimerClient timer) {
+    TimerScreen(TimerClient owner, TimerSession timer) {
         super(text("title"));
+        this.owner = owner;
         this.timer = timer;
         initialOpacity = timer.settings.opacity;
     }
@@ -32,11 +34,13 @@ final class TimerScreen extends Screen {
     protected void init() {
         TimerSettings settings = timer.settings;
         int x = (width - PANEL_WIDTH) / 2;
-        int y = (height - PANEL_HEIGHT) / 2;
+        int y = (height - PANEL_HEIGHT) / 2 + 24;
+        clockTab(owner.game, x, y - 9);
+        clockTab(owner.real, x + 114, y - 9);
         addRenderableWidget(Button.builder(modeLabel(), button -> {
             settings.countdown = !settings.countdown;
             resetClock();
-            settings.save();
+            timer.store.save();
             button.setMessage(modeLabel());
         }).bounds(x, y + 15, PANEL_WIDTH, 20).build());
 
@@ -47,7 +51,7 @@ final class TimerScreen extends Screen {
         apply = addRenderableWidget(Button.builder(text("apply_duration"), button -> {
             settings.seconds = inputDuration();
             resetClock();
-            settings.save();
+            timer.store.save();
             updateApplyButton();
         }).bounds(x + 114, y + 39, 110, 20).build());
         duration.setResponder(value -> updateApplyButton());
@@ -82,6 +86,12 @@ final class TimerScreen extends Screen {
                 .bounds(x + 152, y + 135, 72, 20).build());
     }
 
+    private void clockTab(TimerSession target, int x, int y) {
+        var button = addRenderableWidget(Button.builder(target.title(), ignored ->
+                minecraft.gui.setScreen(new TimerScreen(owner, target))).bounds(x, y, 110, 20).build());
+        button.active = target != timer;
+    }
+
     private CycleButton<Boolean> visibilityButton(String key, boolean initial, Consumer<Boolean> update, int x, int y) {
         return addRenderableWidget(new CycleButton.Builder<Boolean>(
                 value -> text("show." + key, text(value ? "on" : "off")), () -> initial)
@@ -89,7 +99,7 @@ final class TimerScreen extends Screen {
                 .displayOnlyValue()
                 .create(x, y, 110, 20, text("show." + key, ""), (button, value) -> {
                     update.accept(value);
-                    timer.settings.save();
+                    timer.store.save();
                 }));
     }
 
@@ -122,7 +132,7 @@ final class TimerScreen extends Screen {
 
     @Override
     public void removed() {
-        if (timer.settings.opacity != initialOpacity) timer.settings.save();
+        if (timer.settings.opacity != initialOpacity) timer.store.save();
     }
 
     @Override

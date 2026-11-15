@@ -3,27 +3,31 @@ package io.github.ruok0214.ingametimer;
 final class TimerClock {
     static final long NANOS_PER_SECOND = 1_000_000_000L;
     static final int TICKS_PER_SECOND = 20;
-    private static final long UNKNOWN = -1;
+    static final long NANOS_PER_TICK = NANOS_PER_SECOND / TICKS_PER_SECOND;
 
-    private long serverTick = UNKNOWN;
-    private long startedTick = UNKNOWN;
-    private long startedNanos;
-    private long savedTicks;
+    private final boolean gameBased;
+    private long gameTime = -1;
+    private long startedAt;
     private long savedNanos;
     private boolean running;
 
+    TimerClock(boolean gameBased) {
+        this.gameBased = gameBased;
+    }
+
     void observeTick(long tick) {
-        serverTick = tick;
-        if (running && startedTick == UNKNOWN) startedTick = tick;
+        long sample = tick * NANOS_PER_TICK;
+        if (gameTime < 0 && running) startedAt = sample;
+        gameTime = sample;
     }
 
     void changeWorld() {
         reset();
-        serverTick = UNKNOWN;
+        gameTime = -1;
     }
 
-    boolean hasTickClock() {
-        return serverTick != UNKNOWN;
+    boolean isAvailable() {
+        return !gameBased || gameTime >= 0;
     }
 
     boolean isRunning() {
@@ -32,33 +36,25 @@ final class TimerClock {
 
     void start(long now) {
         if (running) return;
-        startedTick = serverTick;
-        startedNanos = now;
+        startedAt = sourceTime(now);
         running = true;
     }
 
     void stop(long now) {
-        savedTicks = elapsedTicks();
         savedNanos = elapsedNanos(now);
         running = false;
     }
 
     void reset() {
-        running = false;
-        savedTicks = 0;
         savedNanos = 0;
-    }
-
-    long elapsedTicks() {
-        return savedTicks + (running && startedTick != UNKNOWN ? serverTick - startedTick : 0);
+        running = false;
     }
 
     long elapsedNanos(long now) {
-        return savedNanos + (running ? now - startedNanos : 0);
+        return savedNanos + (running && isAvailable() ? sourceTime(now) - startedAt : 0);
     }
 
-    boolean expired(long now, int seconds) {
-        return elapsedNanos(now) >= seconds * NANOS_PER_SECOND
-                && (!hasTickClock() || elapsedTicks() >= seconds * (long) TICKS_PER_SECOND);
+    private long sourceTime(long now) {
+        return gameBased ? gameTime : now;
     }
 }
