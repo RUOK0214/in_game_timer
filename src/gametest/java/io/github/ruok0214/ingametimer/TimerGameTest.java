@@ -147,8 +147,8 @@ public final class TimerGameTest implements FabricClientGameTest {
         context.waitTicks(2);
         context.runOnClient(client -> {
             long controls = Screens.getWidgets(client.gui.screen()).stream()
-                    .filter(label("Start").or(label("Reset")).or(label("Settings"))).count();
-            check(controls == 6, "Resizing chat must keep one set of buttons per HUD");
+                    .filter(label("Start").or(label("Reset")).or(label("Settings")).or(label("Hide HUD"))).count();
+            check(controls == 8, "Resizing chat must keep one set of buttons per HUD");
         });
         Point bottomLeft = context.computeOnClient(client -> {
             double scale = client.getWindow().getGuiScale();
@@ -171,15 +171,22 @@ public final class TimerGameTest implements FabricClientGameTest {
         });
 
         openChat(context);
-        context.runOnClient(client -> check(Screens.getWidgets(client.gui.screen()).stream().filter(label("Settings")).count() == 1
+        context.runOnClient(client -> check(Screens.getWidgets(client.gui.screen()).stream()
+                        .filter(widget -> widget.visible).filter(label("Settings")).count() == 1
                         && owner.real.settings.hudVisible && owner.real.settings.opacity == 100,
                 "Hiding or fading one clock must not affect the other"));
+        clickWidget(context, label("Show Game Clock HUD"));
+        context.waitFor(client -> timer.settings.hudVisible);
+        clickWidget(context, label("Hide HUD"));
+        context.waitFor(client -> !timer.settings.hudVisible && owner.real.settings.hudVisible);
+        context.runOnClient(client -> check(!TimerSettings.load().game.hudVisible && client.gui.screen() instanceof ChatScreen,
+                "The chat button must save visibility and keep chat open"));
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
         context.waitFor(client -> client.gui.screen() == null);
-        command(context, "settings");
-        context.waitForScreen(TimerScreen.class);
-        clickWidget(context, label("HUD: Off"));
-        context.clickScreenButton("Done");
+        openChat(context);
+        clickWidget(context, label("Show Game Clock HUD"));
+        context.waitFor(client -> timer.settings.hudVisible && owner.real.settings.hudVisible);
+        context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
         context.waitFor(client -> client.gui.screen() == null && timer.settings.hudVisible);
     }
 

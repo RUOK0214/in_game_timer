@@ -25,6 +25,8 @@
   "in_game_timer.hud.redstone": "redstone tick",
   "in_game_timer.hud.real": "real time",
   "in_game_timer.hud.no_tick_source": "Unavailable",
+  "in_game_timer.hud.chat.hide": "Hide HUD",
+  "in_game_timer.hud.chat.show": "Show %s HUD",
   "in_game_timer.command.running": "Timer running",
   "in_game_timer.command.stopped": "Timer stopped",
   "in_game_timer.command.reset": "Timer reset",

@@ -40,6 +40,11 @@ final class TimerSession {
         else start();
     }
 
+    void toggleHud() {
+        settings.hudVisible = !settings.hudVisible;
+        store.save();
+    }
+
     Component toggleLabel() {
         if (clock.isRunning()) return text("stop");
         long now = System.nanoTime();

@@ -86,10 +86,7 @@ public final class TimerClient implements ClientModInitializer {
         return new KeyBindings(shortcuts.register(prefix + "menu", category, () -> requestMenu(timer)),
                 shortcuts.register(prefix + "toggle", category, timer::toggle),
                 shortcuts.register(prefix + "reset", category, timer.clock::reset),
-                shortcuts.register(prefix + "hud", category, () -> {
-                    timer.settings.hudVisible = !timer.settings.hudVisible;
-                    store.save();
-                }));
+                shortcuts.register(prefix + "hud", category, timer::toggleHud));
     }
 
     private void migrateBindings(Options options) {
