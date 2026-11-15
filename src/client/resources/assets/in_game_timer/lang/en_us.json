@@ -26,7 +26,7 @@
   "in_game_timer.hud.real": "real time",
   "in_game_timer.hud.no_tick_source": "Unavailable",
   "in_game_timer.hud.chat.hide": "Hide HUD",
-  "in_game_timer.hud.chat.show": "Show %s HUD",
+  "in_game_timer.hud.restore_hint": "Use the shortcut or /igt %s hud to show the HUD.",
   "in_game_timer.command.running": "Timer running",
   "in_game_timer.command.stopped": "Timer stopped",
   "in_game_timer.command.reset": "Timer reset",

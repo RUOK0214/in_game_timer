@@ -57,8 +57,12 @@ public final class TimerClient implements ClientModInitializer {
 
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, access) -> dispatcher.register(
                 commands(literal("igt").requires(FabricClientCommandSource::attended), game)
-                        .then(commands(literal("game"), game))
-                        .then(commands(literal("real"), real))));
+                        .then(literal("hud").executes(context -> {
+                            toggleBothHuds();
+                            return 1;
+                        }))
+                        .then(commands(literal("game"), game).then(hudCommand(game)))
+                        .then(commands(literal("real"), real).then(hudCommand(real)))));
         TimerHud.register(this);
     }
 
@@ -126,6 +130,13 @@ public final class TimerClient implements ClientModInitializer {
             run.run();
             String message = reset ? "command.reset" : timer.clock.isRunning() ? "command.running" : "command.stopped";
             context.getSource().sendFeedback(text("command.result", timer.title(), text(message)));
+            return 1;
+        });
+    }
+
+    private static LiteralArgumentBuilder<FabricClientCommandSource> hudCommand(TimerSession timer) {
+        return literal("hud").executes(context -> {
+            timer.toggleHud();
             return 1;
         });
     }

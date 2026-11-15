@@ -175,18 +175,34 @@ public final class TimerGameTest implements FabricClientGameTest {
                         .filter(widget -> widget.visible).filter(label("Settings")).count() == 1
                         && owner.real.settings.hudVisible && owner.real.settings.opacity == 100,
                 "Hiding or fading one clock must not affect the other"));
-        clickWidget(context, label("Show Game Clock HUD"));
-        context.waitFor(client -> timer.settings.hudVisible);
-        clickWidget(context, label("Hide HUD"));
-        context.waitFor(client -> !timer.settings.hudVisible && owner.real.settings.hudVisible);
-        context.runOnClient(client -> check(!TimerSettings.load().game.hudVisible && client.gui.screen() instanceof ChatScreen,
-                "The chat button must save visibility and keep chat open"));
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
         context.waitFor(client -> client.gui.screen() == null);
+        command(context, "game hud");
+        context.waitFor(client -> timer.settings.hudVisible);
         openChat(context);
-        clickWidget(context, label("Show Game Clock HUD"));
-        context.waitFor(client -> timer.settings.hudVisible && owner.real.settings.hudVisible);
+        clickWidget(context, label("Hide HUD"));
+        context.waitFor(client -> !timer.settings.hudVisible && owner.real.settings.hudVisible);
+        context.runOnClient(client -> {
+            check(!TimerSettings.load().game.hudVisible && client.gui.screen() instanceof ChatScreen,
+                    "The chat button must save visibility and keep chat open");
+            var widgets = Screens.getWidgets(client.gui.screen());
+            check(widgets.stream().filter(widget -> widget.visible).filter(label("Settings")).count() == 1
+                            && widgets.stream().noneMatch(label("Show Game Clock HUD")),
+                    "A hidden HUD must have no visible controls or restore button");
+        });
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+        context.waitFor(client -> client.gui.screen() == null);
+        command(context, "hud");
+        context.waitFor(client -> !timer.settings.hudVisible && !owner.real.settings.hudVisible);
+        openChat(context);
+        context.runOnClient(client -> check(Screens.getWidgets(client.gui.screen()).stream()
+                        .noneMatch(label("Settings").or(label("Hide HUD"))),
+                "Chat must show no timer controls when both HUDs are hidden"));
+        context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
+        context.waitFor(client -> client.gui.screen() == null);
+        command(context, "real hud");
+        context.waitFor(client -> !timer.settings.hudVisible && owner.real.settings.hudVisible);
+        command(context, "game hud");
         context.waitFor(client -> client.gui.screen() == null && timer.settings.hudVisible);
     }
 

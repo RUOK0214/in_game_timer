@@ -52,7 +52,7 @@ final class TimerHud {
         });
         ScreenEvents.AFTER_INIT.register((client, screen, width, height) -> {
             if (client.level == null || !(screen instanceof ChatScreen chat)) return;
-            var controls = panels.stream()
+            var controls = panels.stream().filter(panel -> panel.settings.hudVisible)
                     .map(panel -> panel.new ChatControls(owner, chat, client.font)).toList();
             controls.forEach(ChatControls::addButtons);
             ScreenEvents.beforeExtract(chat).register((s, graphics, x, y, delta) ->
@@ -158,7 +158,6 @@ final class TimerHud {
         private final ChatScreen screen;
         private final Font font;
         private final List<Button> buttons;
-        private final Button visibility;
         private Layout currentLayout;
         private boolean dragging;
         private double grabX;
@@ -167,10 +166,6 @@ final class TimerHud {
         private ChatControls(TimerClient owner, ChatScreen screen, Font font) {
             this.screen = screen;
             this.font = font;
-            visibility = Button.builder(text("hud.chat.hide"), button -> {
-                timer.toggleHud();
-                positionButtons();
-            }).build();
             buttons = List.of(
                     Button.builder(timer.toggleLabel(), button -> {
                         timer.toggle();
@@ -181,7 +176,10 @@ final class TimerHud {
                         refreshLabel();
                     }).build(),
                     Button.builder(text("settings"), button -> owner.requestMenu(timer)).build(),
-                    visibility);
+                    Button.builder(text("hud.chat.hide"), button -> {
+                        timer.toggleHud();
+                        positionButtons();
+                    }).build());
             buttons.forEach(button -> button.setTooltip(Tooltip.create(timer.title())));
         }
 
@@ -199,13 +197,12 @@ final class TimerHud {
         }
 
         private void positionButtons() {
+            buttons.forEach(button -> button.visible = settings.hudVisible);
+            if (!settings.hudVisible) return;
             currentLayout = layout(font, screen.width, screen.height);
             refreshLabel();
-            visibility.setMessage(text(settings.hudVisible ? "hud.chat.hide" : "hud.chat.show", timer.title()));
-            List<Button> shown = settings.hudVisible ? buttons : List.of(visibility);
-            buttons.forEach(button -> button.visible = settings.hudVisible || button == visibility);
-            int gapWidth = BUTTON_GAP * (shown.size() - 1);
-            int labelWidth = shown.stream().mapToInt(button -> font.width(button.getMessage()) + 10).sum();
+            int gapWidth = BUTTON_GAP * (buttons.size() - 1);
+            int labelWidth = buttons.stream().mapToInt(button -> font.width(button.getMessage()) + 10).sum();
             int controlsWidth = Math.max(Math.max(MIN_WIDTH, currentLayout.width()), labelWidth + gapWidth);
             int buttonX = Math.clamp(currentLayout.x() + (currentLayout.width() - controlsWidth) / 2,
                     MARGIN, Math.max(MARGIN, screen.width - controlsWidth - MARGIN));
@@ -214,10 +211,10 @@ final class TimerHud {
                 buttonY = currentLayout.y() - BUTTON_HEIGHT - BUTTON_GAP;
             }
             int extra = controlsWidth - gapWidth - labelWidth;
-            for (int i = 0; i < shown.size(); i++) {
-                Button button = shown.get(i);
+            for (int i = 0; i < buttons.size(); i++) {
+                Button button = buttons.get(i);
                 int width = font.width(button.getMessage()) + 10
-                        + extra * (i + 1) / shown.size() - extra * i / shown.size();
+                        + extra * (i + 1) / buttons.size() - extra * i / buttons.size();
                 button.setX(buttonX);
                 button.setY(buttonY);
                 button.setWidth(width);
@@ -226,11 +223,11 @@ final class TimerHud {
         }
 
         private boolean click(MouseButtonEvent mouse) {
-            if (mouse.button() != GLFW.GLFW_MOUSE_BUTTON_LEFT) return true;
+            if (!settings.hudVisible || mouse.button() != GLFW.GLFW_MOUSE_BUTTON_LEFT) return true;
             for (Button button : buttons) {
                 if (button.visible && button.mouseClicked(mouse, false)) return false;
             }
-            if (!settings.hudVisible || !currentLayout.contains(mouse.x(), mouse.y())) return true;
+            if (!currentLayout.contains(mouse.x(), mouse.y())) return true;
             dragging = true;
             grabX = mouse.x() - currentLayout.x();
             grabY = mouse.y() - currentLayout.y();
