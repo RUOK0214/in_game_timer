@@ -61,12 +61,8 @@ final class TimerScreen extends Screen {
         visibilityButton("game", settings.gameTicks, value -> settings.gameTicks = value, x, y + step * 3);
         visibilityButton("redstone", settings.redstoneTicks, value -> settings.redstoneTicks = value, x + 114, y + step * 3);
         visibilityButton("real", settings.realTime, value -> settings.realTime = value, x, y + step * 4);
-        var hud = addRenderableWidget(Button.builder(text("show.hud", text(settings.hudVisible ? "on" : "off")), button -> {
-            timer.toggleHud();
-            button.setMessage(text("show.hud", text("off")));
-            updateHudButton(button);
-        }).bounds(x + 114, y + step * 4, 110, 20).build());
-        updateHudButton(hud);
+        visibilityButton("hud", settings.hudVisible, value -> settings.hudVisible = value, x + 114, y + step * 4)
+                .setTooltip(Tooltip.create(text("drag_hint")));
         visibilityButton("minimal", settings.minimal, value -> settings.minimal = value, x, y + step * 5);
         addRenderableWidget(Button.builder(text("keybindings"), button ->
                 minecraft.gui.setScreen(new TimerKeyScreen(this, timer, owner)))
@@ -110,11 +106,6 @@ final class TimerScreen extends Screen {
                     update.accept(value);
                     timer.store.save();
                 }));
-    }
-
-    private void updateHudButton(Button button) {
-        button.active = timer.settings.hudVisible;
-        button.setTooltip(Tooltip.create(button.active ? text("drag_hint") : text("hud.restore_hint", timer.id)));
     }
 
     private int inputDuration() {

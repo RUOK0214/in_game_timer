@@ -16,7 +16,7 @@ Minecraft Java Edition 26.2용 Fabric 모드입니다. Fabric Loader 0.19.5 이�
 
 **두 HUD 표시 / 숨기기**는 양쪽 설정 화면에서 지정할 수 있는 공통 단축키입니다. HUD가 하나라도 보이면 둘 다 숨기고, 둘 다 숨겨져 있으면 함께 표시합니다.
 
-`T`를 눌러 채팅을 열면 표시 중인 HUD에서 시작·정지·재개, 초기화, 설정, HUD 숨기기를 조작할 수 있습니다. HUD를 숨기면 채팅 버튼도 사라집니다. 다시 표시하려면 단축키나 HUD 명령어를 사용하세요. 각 HUD 본문을 마우스로 드래그해 위치를 따로 저장할 수 있습니다.
+`T`를 눌러 채팅을 열면 표시 중인 HUD에서 시작·정지·재개, 초기화, 설정, HUD 숨기기를 조작할 수 있습니다. HUD를 숨기면 채팅 버튼도 사라집니다. 설정창의 HUD 버튼을 누르거나 단축키 또는 HUD 명령어를 사용해 다시 표시할 수 있습니다. 각 HUD 본문을 마우스로 드래그해 위치를 따로 저장할 수 있습니다.
 
 설정 화면 상단에서 시계를 선택합니다. HUD 표시 여부, 불투명도(0~100%), 게임틱·레드스톤틱·시간 표시 여부, 스톱워치·카운트다운 모드와 길이를 시계별로 바꿀 수 있습니다. 두 HUD를 동시에 표시할 수 있습니다. 모드나 카운트다운 길이를 바꾸면 해당 시계의 측정값이 초기화됩니다. 기존 설정은 게임 기준 시계에 적용됩니다.
 
@@ -30,4 +30,4 @@ HUD에는 `game tick`, `redstone tick`, `real time`을 표시합니다. **최소
 
 ## 빌드
 
-JDK 25로 Windows에서는 `gradlew.bat build`, macOS와 Linux에서는 `./gradlew build`를 실행하세요. 설치용 JAR은 `build/libs/in-game-timer-1.6.2.jar`에 생성됩니다.
+JDK 25로 Windows에서는 `gradlew.bat build`, macOS와 Linux에서는 `./gradlew build`를 실행하세요. 설치용 JAR은 `build/libs/in-game-timer-1.6.3.jar`에 생성됩니다.

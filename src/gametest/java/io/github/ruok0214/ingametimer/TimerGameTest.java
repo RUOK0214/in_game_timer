@@ -177,8 +177,13 @@ public final class TimerGameTest implements FabricClientGameTest {
                 "Hiding or fading one clock must not affect the other"));
         context.getInput().pressKey(GLFW.GLFW_KEY_ESCAPE);
         context.waitFor(client -> client.gui.screen() == null);
-        command(context, "game hud");
-        context.waitFor(client -> timer.settings.hudVisible);
+        command(context, "game settings");
+        context.waitForScreen(TimerScreen.class);
+        clickWidget(context, label("HUD: Off"));
+        context.waitFor(client -> timer.settings.hudVisible && TimerSettings.load().game.hudVisible
+                && Screens.getWidgets(client.gui.screen()).stream().anyMatch(label("HUD: On")));
+        context.clickScreenButton("Done");
+        context.waitFor(client -> client.gui.screen() == null);
         openChat(context);
         clickWidget(context, label("Hide HUD"));
         context.waitFor(client -> !timer.settings.hudVisible && owner.real.settings.hudVisible);
