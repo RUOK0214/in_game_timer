@@ -1,4 +1,6 @@
 {
+  "modmenu.summaryTranslation.in_game_timer": "게임 기준 시계와 현실 기준 시계를 HUD에 표시합니다.",
+  "modmenu.descriptionTranslation.in_game_timer": "일시정지하면 함께 멈추는 게임 기준 시계와 계속 흐르는 현실 기준 시계를 동시에 사용할 수 있습니다. 각 시계에서 스톱워치 또는 카운트다운을 선택하고 게임틱, 레드스톤틱, 시간을 표시할 수 있습니다. 채팅을 열어 HUD 버튼을 사용하거나 /igt settings로 설정을 여세요.",
   "in_game_timer.title": "인게임 타이머",
   "in_game_timer.clock.game": "게임 기준 시계",
   "in_game_timer.clock.real": "현실 기준 시계",

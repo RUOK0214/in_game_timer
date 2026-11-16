@@ -1,4 +1,6 @@
 {
+  "modmenu.summaryTranslation.in_game_timer": "Two HUD clocks for game time and real time.",
+  "modmenu.descriptionTranslation.in_game_timer": "Run a game clock that pauses with the world and a real-time clock that keeps going. Use either as a stopwatch or countdown and choose which of game ticks, redstone ticks, and time to display. Open chat to use the HUD buttons, or type /igt settings to configure either clock.",
   "in_game_timer.title": "In-Game Timer",
   "in_game_timer.clock.game": "Game Clock",
   "in_game_timer.clock.real": "Real Clock",

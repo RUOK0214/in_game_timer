@@ -3,8 +3,13 @@
   "id": "in_game_timer",
   "version": "${version}",
   "name": "In-Game Timer",
-  "description": "Independent game tick, redstone tick and monotonic real-time clocks.",
+  "description": "Show a game clock and a real-time clock while you play. Use each as a stopwatch or countdown and display game ticks, redstone ticks, or elapsed time. Open chat to use the HUD buttons, or type /igt settings to configure either clock.",
   "authors": ["RUOK0214"],
+  "license": "MIT",
+  "icon": "assets/in_game_timer/icon.png",
+  "contact": {
+    "sources": "https://github.com/RUOK0214/in_game_timer"
+  },
   "environment": "*",
   "mixins": [{ "config": "in_game_timer.mixins.json", "environment": "client" }],
   "entrypoints": {

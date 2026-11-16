@@ -28,6 +28,10 @@ processResources {
     filesMatching('fabric.mod.json') { expand version: project.version }
 }
 
+jar {
+    from('LICENSE') { rename { 'LICENSE_in_game_timer' } }
+}
+
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.release = 25

@@ -30,4 +30,4 @@ HUD에는 `game tick`, `redstone tick`, `real time`을 표시합니다. **최소
 
 ## 빌드
 
-JDK 25로 Windows에서는 `gradlew.bat build`, macOS와 Linux에서는 `./gradlew build`를 실행하세요. 설치용 JAR은 `build/libs/in-game-timer-1.6.1.jar`에 생성됩니다.
+JDK 25로 Windows에서는 `gradlew.bat build`, macOS와 Linux에서는 `./gradlew build`를 실행하세요. 설치용 JAR은 `build/libs/in-game-timer-1.6.2.jar`에 생성됩니다.
